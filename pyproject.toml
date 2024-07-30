@@ -14,7 +14,7 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
 dependencies = [
-    "geenuff @ git+https://github.com/weberlab-hhu/GeenuFF@v0.3.2",
+    "geenuff @ git+https://github.com/anthony-aylward/GeenuFF",
     "sqlalchemy==1.3.22",
     "tensorflow>=2.6.2",
     "tensorflow-addons>=0.21.0",
@@ -23,7 +23,7 @@ dependencies = [
     "Keras<3.0.0",
     "keras_layer_normalization",
     "terminaltables",
-    "HTSeq",
+    "HTSeq==2.0.5",
     "intervaltree",
     "numpy",
     "h5py",
