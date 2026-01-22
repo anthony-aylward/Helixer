@@ -429,10 +429,11 @@ class CoordNumerifier(object):
             # additional derived matrices
             err_samples = np.any(sample_weights, axis=1)
             # just one entry per chunk
-            if one_hot:
-                fully_intergenic_samples = np.all(y[:, :, 0] == 0, axis=1)
-            else:
-                fully_intergenic_samples = np.all(y[:, :, 0] == 1, axis=1)
+            if one_hot:  # question: when isn't it one hot encoded?
+                is_first_class_position_intergenic = 1
+                fully_intergenic_samples = np.all(y[:, :, 0] == is_first_class_position_intergenic, axis=1)
+            else:  # will never be executed with the current setup
+                fully_intergenic_samples = np.all(y[:, :, 0] == 1, axis=1)  # todo: might be wrong, but is never called
 
             # do not output the input_masks as it is not used for anything
             out = [MatAndInfo('y', y, 'int8'),  # y should always be first (bc currently we always want it)

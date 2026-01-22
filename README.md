@@ -37,7 +37,8 @@ You can then skip the installation instructions down below.
 The installation time depends on the installation method you are using (e.g.
 [docker/singularity](#via-docker--singularity-recommended) or
 [manual installation](#manual-installation)(only for Linux)) and your experience in using GitHub, Python and
-CUDA. The time it takes a decently experienced user to install Helixer is 20-30 minutes.
+CUDA. The time it takes a decently experienced user to install Helixer is 20-30 minutes; for inexperienced
+users it usually takes a maximum of 2-3 hours.
 
 There is the possibility to install Helixer on macOS which requires a few adjustments. Instructions can be
 found [here](docs/helixer_on_macOS.md).
@@ -105,7 +106,7 @@ models, please provide `--downloaded-model-path <path_to_download_models_to>` wh
 running `Helixer.py`. Otherwise, the default folder will be checked.
 
 Downloaded models (and any new releases) can also be found at
-https://zenodo.org/records/10836346, but we recommend simply using
+https://zenodo.org/records/17850139, but we recommend simply using
 the autodownload.
 
 

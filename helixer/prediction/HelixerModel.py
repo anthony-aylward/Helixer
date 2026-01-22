@@ -964,7 +964,7 @@ class HelixerModel(ABC):
                 else:
                     old_len = pred_out[dset_name].shape[0]
                     pred_out[dset_name].resize(old_len + pred_dset.shape[0], axis=0)
-                    pred_out[dset_name][old_len:] = pred_dset  # todo, check result if this really is correct
+                    pred_out[dset_name][old_len:] = pred_dset
                     pred_out.flush()
 
         # add model config and other attributes to predictions
