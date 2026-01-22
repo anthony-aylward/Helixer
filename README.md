@@ -43,6 +43,9 @@ users it usually takes a maximum of 2-3 hours.
 There is the possibility to install Helixer on macOS which requires a few adjustments. Instructions can be
 found [here](docs/helixer_on_macOS.md).
 
+There is the possibility to install Helixer on macOS which requires a few adjustments. Instructions can be
+found [here](docs/helixer_on_macOS.md).
+
 ### GPU requirements
 For realistically sized datasets, an Nvidia GPU or an Apple Silicon GPU (M1/M2/M3) using
 Apple Metal Performance Shaders (MPS) GPU acceleration (beta support) will be necessary
