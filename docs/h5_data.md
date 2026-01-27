@@ -76,6 +76,14 @@ until the start of the next codon).
 
 Will be used as labels for the network.
 
+Example:
+
+|     |     |     |     |
+|:----|:----|:----|:----|
+| ATG | GGC | TGC | TAA |
+| 021 | 021 | 021 | 021 |
+\* this is the biological convention to count codon positions
+
 ##### sample_weights
 One value per base pair. This is used to adjust
 the sample_weights and there-by the loss, so 
