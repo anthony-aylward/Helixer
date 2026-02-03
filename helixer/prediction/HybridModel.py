@@ -7,6 +7,9 @@ from termcolor import colored
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Conv1D, LSTM, Dense, Bidirectional, Dropout, Reshape,
                                      Activation, Input, BatchNormalization)
+from keras.utils import register_keras_serializable
+from tensorflow.keras.layers import Layer
+from tensorflow.keras.activations import relu
 from helixer.prediction.HelixerModel import HelixerModel, HelixerSequence
 from helixer.core.helpers import get_log_dict
 
@@ -22,6 +25,16 @@ class HybridSequence(HelixerSequence):
             return X
         else:
             return X, y, sw
+
+
+@register_keras_serializable()
+class CustomReLU(Layer):
+    def __init__(self, alpha, **kwargs):
+        super().__init__(**kwargs)
+        self.alpha = alpha
+
+    def call(self, inputs):
+        return relu(inputs, alpha=self.alpha)
 
 
 class HybridModel(HelixerModel):
