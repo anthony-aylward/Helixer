@@ -807,7 +807,7 @@ class HelixerModel(ABC):
                     err_samples = np.array(h5_file['/data/err_samples'])
                     n_correct = np.count_nonzero(err_samples == False)
                     if n_correct == 0:
-                        logger.warning(colored('WARNING: no fully correct sample found'), 'yellow')
+                        logger.warning(colored('WARNING: no fully correct sample found', 'yellow'))
                 else:
                     logger.info('No err_samples dataset found, correct samples will be set to 0')
                     n_correct = 0
