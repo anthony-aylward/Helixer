@@ -105,7 +105,7 @@ models, please provide `--downloaded-model-path <path_to_download_models_to>` wh
 running `Helixer.py`. Otherwise, the default folder will be checked.
 
 Downloaded models (and any new releases) can also be found at
-https://zenodo.org/records/10836346, but we recommend simply using
+https://zenodo.org/records/17850139, but we recommend simply using
 the autodownload.
 
 
