@@ -268,7 +268,7 @@ def main():
         if helixerpost_out.returncode == 0:
             run_time = time.time() - start_time
             logger.info(colored(f'\nHelixer successfully finished the annotation of {args.fasta_path} '
-                                f'in {run_time / (60 * 60):.2f} hours. '
+                                f'in {run_time / 60:.2f} minutes. '
                                 f'GFF file written to {args.gff_output_path}.', 'green'))
         else:
             print(colored('\nAn error occurred during post processing. Exiting.', 'red'), file=sys.stderr)
