@@ -952,7 +952,6 @@ class HelixerModel(ABC):
                 # prepare h5 dataset and save the predictions to disk
                 pred_dset = pred_dset.astype(np.float16)
                 if batch_index == 0:
-                    old_len = 0
                     pred_out.create_dataset(dset_name,
                                             data=pred_dset,
                                             maxshape=(None,) + pred_dset.shape[1:],
@@ -986,6 +985,7 @@ class HelixerModel(ABC):
         pred_out.close()
         # close model file after extracting meta-data
         h5_model.close()
+        print(flush=True)
         logger.info('prediction took {:.2f} minutes\n'.format(int(time.time() - start_time) / 60))
 
     def _print_model_info(self, model):

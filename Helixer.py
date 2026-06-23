@@ -99,7 +99,7 @@ class HelixerParameterParser(ParameterParser):
             'window_size': 100,
             'edge_threshold': 0.1,
             'peak_threshold': 0.8,
-            'min_coding_length': 100,
+            'min_coding_length': 60,
         }
         self.defaults = {**self.defaults, **helixer_defaults}
 
