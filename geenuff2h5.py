@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import argparse
 import logging.config
 from pprint import pformat
 from termcolor import colored
@@ -8,7 +9,7 @@ from helixer.export.exporter import HelixerExportController
 from helixer.core.helpers import get_log_dict
 
 
-def main(args):
+def main(args: argparse.Namespace) -> None:
     if args.modes == 'all':
         modes = ('X', 'y', 'anno_meta', 'transitions')
     else:
