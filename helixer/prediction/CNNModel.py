@@ -3,7 +3,7 @@ import random
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv1D, Dense, Flatten
-from HelixerModel import HelixerModel, HelixerSequence
+from helixer.prediction.HelixerModel import HelixerModel, HelixerSequence
 
 
 class CNNSequence(HelixerSequence):

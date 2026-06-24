@@ -514,7 +514,8 @@ if __name__ == "__main__":
         raise FileNotFoundError(f"file {args.h5_data} doesn't exist")
 
     try:
-        h5py.File(args.h5_data, "r")
+        with h5py.File(args.h5_data, 'r'):
+            pass
     except OSError as e:
         raise OSError(f"{args.h5_data} is not a h5 file, please provide a valid h5 file") from e
 

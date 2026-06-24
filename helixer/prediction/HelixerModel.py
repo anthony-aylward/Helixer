@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import ast
 import os
 import sys
 import io
@@ -245,7 +246,7 @@ class HelixerSequence(Sequence):
                                                                   h5_file['data/start_ends'][offset:offset + max_at_once][step_mask],
                                                                   data_slice)
                 if self.no_utrs and name == 'data/y':
-                    HelixerSequence._zero_out_utrs(self.chunk_size, )
+                    HelixerSequence._zero_out_utrs(data_slice)
                 data_list.extend([self.compressor.encode(e) for e in data_slice])
             logger.info(f'Data loading of {n_seqs - n_masked} (total so far {len(data_list)}) samples of {name} '
                         f'into memory took {time.time() - start_time_dset:.2f} secs')
@@ -612,14 +613,14 @@ class HelixerModel(ABC):
         assert not (not self.testing and self.test_data)
         assert not (self.resume_training and (not self.load_model_path or not self.data_dir))
 
-        self.class_weights = eval(self.class_weights)
+        self.class_weights = ast.literal_eval(self.class_weights)
         if not isinstance(self.class_weights, (list, np.ndarray, type(None))):
             raise ValueError(f'--class-weights evaluated to {self.class_weights} of type {type(self.class_weights)}; '
                              f'this commonly means you need to remove nested quotes')
         if type(self.class_weights) is list:
             self.class_weights = np.array(self.class_weights, dtype=np.float32)
 
-        self.transition_weights = eval(self.transition_weights)
+        self.transition_weights = ast.literal_eval(self.transition_weights)
         if not isinstance(self.transition_weights, (list, np.ndarray, type(None))):
             raise ValueError(f'--transition-weights evaluated to {self.transition_weights} '
                              f'of type {type(self.transition_weights)}; '
@@ -699,21 +700,21 @@ class HelixerModel(ABC):
         training_species = [s.lower() for s in training_species]
         eval_file_names = glob.glob(f'{folder}/*.h5')
         for i, eval_file_name in enumerate(eval_file_names):
-            h5_eval = h5py.File(eval_file_name, 'r')
-            species_name = os.path.basename(eval_file_name).split('.')[0]
-            logger.info(f'\nEvaluating with a sample of {species_name} ({i + 1}/{len(eval_file_names)})')
+            with h5py.File(eval_file_name, 'r') as h5_eval:
+                species_name = os.path.basename(eval_file_name).split('.')[0]
+                logger.info(f'\nEvaluating with a sample of {species_name} ({i + 1}/{len(eval_file_names)})')
 
-            # possibly adjust batch size based on sample length, which could be flexible
-            # assume the given batch size is for 20k length
-            sample_len = h5_eval['data/X'].shape[1]
-            adjusted_batch_size = int(generator.batch_size * (20000 / sample_len))
-            logger.info(f'adjusted batch size is {adjusted_batch_size}')
+                # possibly adjust batch size based on sample length, which could be flexible
+                # assume the given batch size is for 20k length
+                sample_len = h5_eval['data/X'].shape[1]
+                adjusted_batch_size = int(generator.batch_size * (20000 / sample_len))
+                logger.info(f'adjusted batch size is {adjusted_batch_size}')
 
-            # use exactly the data generator that is used during validation
-            GenCls = generator.__class__
-            gen = GenCls(model=generator.model, h5_file=h5_eval, mode='val',
-                         batch_size=adjusted_batch_size, shuffle=False)
-            perf_one_species = HelixerModel.run_metrics(gen, model, print_to_stdout=print_to_stdout, calc_H=calc_H)
+                # use exactly the data generator that is used during validation
+                GenCls = generator.__class__
+                gen = GenCls(model=generator.model, h5_file=h5_eval, mode='val',
+                             batch_size=adjusted_batch_size, shuffle=False)
+                perf_one_species = HelixerModel.run_metrics(gen, model, print_to_stdout=print_to_stdout, calc_H=calc_H)
             results.append([species_name, perf_one_species])
         # print results in tables sorted alphabetically and by f1
         results_by_name = sorted(results, key=lambda r: r[0])
@@ -723,7 +724,7 @@ class HelixerModel(ABC):
 
         # print one number summaries
         f1_scores = np.array([r[1][2] for r in results])
-        in_train = np.array([r[0].lower() in training_species for r in results], dtype=np.bool)
+        in_train = np.array([r[0].lower() in training_species for r in results], dtype=bool)
         table = [['Metric', 'All', 'Training', 'Evaluation']]
         for name, func in zip(['Median F1', 'Average F1', 'Stddev F1'], [np.median, np.mean, np.std]):
             table.append([name, f'{func(f1_scores):.4f}',
@@ -766,7 +767,7 @@ class HelixerModel(ABC):
             for h5_file in h5_files:
                 if 'err_samples' in h5_file['/data'].keys():
                     err_samples = np.array(h5_file['/data/err_samples'])
-                    n_correct = np.count_nonzero(err_samples == False)
+                    n_correct = np.count_nonzero(err_samples)
                     if n_correct == 0:
                         logger.warning(colored('WARNING: no fully correct sample found', 'yellow'))
                 else:
@@ -780,7 +781,7 @@ class HelixerModel(ABC):
             for h5_file in h5_files:
                 if 'fully_intergenic_samples' in h5_file['/data'].keys():
                     ic_samples = np.array(h5_file['/data/fully_intergenic_samples'])
-                    n_fully_ig = np.count_nonzero(ic_samples == True)
+                    n_fully_ig = np.count_nonzero(ic_samples)
                     if n_fully_ig == 0:
                         logger.warning(colored('WARNING: no fully intergenic samples found', 'yellow'))
                 else:
@@ -1054,7 +1055,8 @@ class HelixerModel(ABC):
                 _, _, _ = HelixerModel.run_metrics(test_generator, model, calc_H=self.calculate_uncertainty)
                 if self.large_eval_folder:
                     assert self.data_dir != '', 'need training data of the model for training genome names'
-                    training_species = h5py.File(os.path.join(self.data_dir, 'training_data.h5'), 'r').attrs['genomes']
+                    with h5py.File(os.path.join(self.data_dir, 'training_data.h5'), 'r') as h5_train:
+                        training_species = h5_train.attrs['genomes']
                     _ = HelixerModel.run_large_eval(self.large_eval_folder, model, test_generator, training_species,
                                                     print_to_stdout=True, calc_H=self.calculate_uncertainty)
             else:

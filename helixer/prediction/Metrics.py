@@ -294,8 +294,7 @@ class Metrics:
                     X, y_true, sw = inputs
                     y_pred = model.predict_on_batch(X)
             else:
-                print(f'Unknown inputs from keras sequence: {inputs}', file=sys.stderr)
-                exit()
+                raise ValueError(f'Unknown inputs from keras sequence: {inputs}')
 
             data = {'genic_base_wise': [self.cm_genic, (y_true, y_pred)]}
             if mode == 'phase':
