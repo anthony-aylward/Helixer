@@ -266,10 +266,3 @@ worse. Validation files _can_ be
 [down sampled](https://github.com/weberlab-hhu/helixer_scratch/blob/master/data_scripts/sample-single-genomes.py)
 for speed purposes. 
 
-### Hyperparameter optimization
-The Helixer codebase is built to work with [nni](https://github.com/microsoft/nni)
-for hyperparameter optimization. If you want to optimize the hyperparameters, we recommend
-following standard nni instructions on setting up the config.yml
-and search_space.json files and additionally adding
-`--nni` to the `HybridModel.py` command.
-

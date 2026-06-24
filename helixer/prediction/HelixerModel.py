@@ -6,10 +6,6 @@ import contextlib
 
 import helixer.core.helpers
 
-try:
-    import nni
-except ImportError:
-    pass
 import time
 import glob
 import h5py
@@ -42,7 +38,7 @@ logger = logging.getLogger('HelixerLogger')
 
 class ConfusionMatrixTrain(Callback):
     def __init__(self, save_model_path, train_generator, val_generator, large_eval_folder, patience, calc_H=False,
-                 report_to_nni=False, check_every_nth_batch=1_000_000, save_every_check=False):
+                 check_every_nth_batch=1_000_000, save_every_check=False):
         self.save_model_path = save_model_path
         self.save_dir = os.path.dirname(save_model_path)
         self.save_every_check = save_every_check
@@ -51,7 +47,6 @@ class ConfusionMatrixTrain(Callback):
         self.large_eval_folder = large_eval_folder
         self.patience = patience
         self.calc_H = calc_H
-        self.report_to_nni = report_to_nni
         self.best_val_genic_f1 = 0.0
         self.checks_without_improvement = 0
         self.check_every_nth_batch = check_every_nth_batch  # high default for ~ 1 / epoch
@@ -81,8 +76,6 @@ class ConfusionMatrixTrain(Callback):
 
     def check_in(self, batch=None):
         _, _, val_genic_f1 = HelixerModel.run_metrics(self.val_generator, self.model, calc_H=self.calc_H)
-        if self.report_to_nni:
-            nni.report_intermediate_result(val_genic_f1)
         if val_genic_f1 > self.best_val_genic_f1:
             self.best_val_genic_f1 = val_genic_f1
             self.freeze_layers(self.model)
@@ -117,11 +110,7 @@ class ConfusionMatrixTrain(Callback):
             training_species = self.train_generator.h5_file.attrs['genomes']
             median_f1 = HelixerModel.run_large_eval(self.large_eval_folder, best_model, self.val_generator, training_species)
 
-            if self.report_to_nni:
-                nni.report_final_result(median_f1)
 
-        elif self.report_to_nni:
-            nni.report_final_result(self.best_val_genic_f1)
 
 
 class PreshuffleCallback(Callback):
@@ -570,7 +559,6 @@ class HelixerModel(ABC):
                                       'consider setting to match the number of GPUs')
         # misc flags
         self.parser.add_argument('--save-every-check', action='store_true')
-        self.parser.add_argument('--nni', action='store_true')
         self.parser.add_argument('-v', '--verbose', action='store_true')
         self.parser.add_argument('--debug', action='store_true')
         tuner = self.parser.add_argument_group('fine tuning',
@@ -614,33 +602,6 @@ class HelixerModel(ABC):
 
         self.__dict__.update(args)
 
-        if self.nni:
-            hyperopt_args = nni.get_next_parameter()
-            for key in hyperopt_args.keys():
-                has_dash = key.find('-') > -1
-                if key not in args:
-                    if has_dash:
-                        maybe_fixed = key.replace('-', '_')
-                        raise AssertionError(f'Parameter from nni: "{key}" does not match parsed arguments.\n'
-                                             f'Hint: "{key}" contains a "-"; maybe it should be "{maybe_fixed}" '
-                                             'so as to match arguments parsed by ArgumentParser?')
-                    else:
-                        raise AssertionError(f'Parameter from nni: "{key}" does not match processed arguments')
-
-            # cast int params to int as we may get them as float
-            hyperopt_args = {name: (int(value) if isinstance(self.parser.get_default(name), int) else value)
-                             for name, value in hyperopt_args.items()}
-            # add args to class name space
-            self.__dict__.update(hyperopt_args)
-            nni_save_model_path = os.path.expandvars('$NNI_OUTPUT_DIR/best_model.h5')
-            nni_pred_output_path = os.path.expandvars('$NNI_OUTPUT_DIR/predictions.h5')
-            self.__dict__['save_model_path'] = nni_save_model_path
-            self.__dict__['prediction_output_path'] = nni_pred_output_path
-            args.update(hyperopt_args)
-            # for the print-out
-            args['save_model_path'] = nni_save_model_path
-            args['prediction_output_path'] = nni_pred_output_path
-
         self.testing = bool(self.load_model_path and not self.resume_training)
         self.only_predictions = (self.testing and not self.eval)  # do only load X in this case
 
@@ -654,7 +615,7 @@ class HelixerModel(ABC):
         self.class_weights = eval(self.class_weights)
         if not isinstance(self.class_weights, (list, np.ndarray, type(None))):
             raise ValueError(f'--class-weights evaluated to {self.class_weights} of type {type(self.class_weights)}; '
-                             f'this commonly means you need to remove nested quotes if not starting with nni')
+                             f'this commonly means you need to remove nested quotes')
         if type(self.class_weights) is list:
             self.class_weights = np.array(self.class_weights, dtype=np.float32)
 
@@ -662,7 +623,7 @@ class HelixerModel(ABC):
         if not isinstance(self.transition_weights, (list, np.ndarray, type(None))):
             raise ValueError(f'--transition-weights evaluated to {self.transition_weights} '
                              f'of type {type(self.transition_weights)}; '
-                             f'this commonly means you need to remove nested quotes if not starting with nni')
+                             f'this commonly means you need to remove nested quotes')
         if type(self.transition_weights) is list:
             self.transition_weights = np.array(self.transition_weights, dtype=np.float32)
 
@@ -682,7 +643,7 @@ class HelixerModel(ABC):
     def generate_callbacks(self, train_generator):
         callbacks = [ConfusionMatrixTrain(self.save_model_path, train_generator, self.gen_validation_data(),
                                           self.large_eval_folder, self.patience, calc_H=self.calculate_uncertainty,
-                                          report_to_nni=self.nni, check_every_nth_batch=self.check_every_nth_batch,
+                                          check_every_nth_batch=self.check_every_nth_batch,
                                           save_every_check=self.save_every_check),
                      PreshuffleCallback(train_generator)]
         return callbacks
