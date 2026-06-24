@@ -4,7 +4,6 @@ import logging
 import geenuff.base.types
 import numpy as np
 import math
-import logging
 import multiprocess
 from abc import ABC, abstractmethod
 
@@ -420,7 +419,7 @@ class CoordNumerifier(object):
 
             # mark examples from featureless coordinate / assume there is no trustworthy annotation
             if not coord_features:
-                logging.warning('Sequence {} has no annotations'.format(coord.seqid))
+                logger.warning('Sequence {} has no annotations'.format(coord.seqid))
                 is_annotated = [0] * len(y)
             else:
                 is_annotated = [1] * len(y)
@@ -457,8 +456,8 @@ class SplitFinder:
         if write_by % chunk_size:
             old_write_by = write_by
             write_by = chunk_size * (write_by // chunk_size)
-            logging.info(f'parameter "write_by" changed from {old_write_by} to {write_by} to be a multiple'
-                         f'of "subsequence length" {chunk_size}')
+            logger.info(f'parameter "write_by" changed from {old_write_by} to {write_by} to be a multiple'
+                        f'of "subsequence length" {chunk_size}')
         self.features = features
         self.write_by = write_by  # target writing this many bp to the h5 file at once
         self.coord_length = coord_length

@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 import h5py
+import argparse
 import tempfile
 import subprocess
 from termcolor import colored
@@ -19,7 +20,7 @@ from helixer.core.helpers import get_log_dict
 
 
 class HelixerParameterParser(ParameterParser):
-    def __init__(self, config_file_path=''):
+    def __init__(self, config_file_path: str = ''):
         super().__init__(config_file_path)
         self.io_group.add_argument('--fasta-path', type=str, required=True, help='FASTA input file.')
         self.io_group.add_argument('--gff-output-path', type=str, required=True, help='Output GFF3 file path.')
@@ -104,7 +105,7 @@ class HelixerParameterParser(ParameterParser):
         self.defaults = {**self.defaults, **helixer_defaults}
 
     @staticmethod
-    def check_for_lineage_model(lineage, downloaded_model_path):
+    def check_for_lineage_model(lineage: str, downloaded_model_path: str):
         # which models are available?
         model_path = set_model_path(downloaded_model_path)
         priorty_ms = prioritized_models(lineage, model_path)
@@ -114,7 +115,7 @@ class HelixerParameterParser(ParameterParser):
         report_if_current_not_best(priorty_ms, current_model)
         return os.path.join(model_path, lineage, current_model)
 
-    def check_args(self, args):
+    def check_args(self, args: argparse.Namespace):
 
         if args.model_filepath is not None:
             print(f'overriding the lineage based model, '

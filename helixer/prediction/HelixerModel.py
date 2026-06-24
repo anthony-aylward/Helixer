@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
 import ast
+from collections.abc import Iterable
 import os
 import sys
 import io
 import contextlib
-
-import helixer.core.helpers
-
 import time
 import glob
 import h5py
@@ -31,6 +29,7 @@ from tensorflow.keras.utils import Sequence
 from tensorflow.keras.layers import Input
 from tensorflow_addons.optimizers import AdamW
 
+import helixer.core.helpers
 from helixer.prediction.Metrics import Metrics
 from helixer.core import overlap
 
@@ -38,8 +37,10 @@ logger = logging.getLogger('HelixerLogger')
 
 
 class ConfusionMatrixTrain(Callback):
-    def __init__(self, save_model_path, train_generator, val_generator, large_eval_folder, patience, calc_H=False,
-                 check_every_nth_batch=1_000_000, save_every_check=False):
+    def __init__(self, save_model_path: str, train_generator: 'HelixerSequence',
+                 val_generator: 'HelixerSequence', large_eval_folder: str, patience: int,
+                 calc_H: bool = False, check_every_nth_batch: int = 1_000_000,
+                 save_every_check: bool = False) -> None:
         self.save_model_path = save_model_path
         self.save_dir = os.path.dirname(save_model_path)
         self.save_every_check = save_every_check
@@ -54,20 +55,20 @@ class ConfusionMatrixTrain(Callback):
         self.epoch = 0
         logger.info(self.save_model_path + ' is the path models will be saved to')
 
-    def on_epoch_begin(self, epoch, logs=None):
+    def on_epoch_begin(self, epoch: int, logs: dict | None = None) -> None:
         self.epoch_start = time.time()
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
         logger.info(f'training took {(time.time() - self.epoch_start) / 60:.2f}m')
         self.check_in()
         self.epoch += 1
 
-    def on_train_batch_end(self, batch, logs=None):
+    def on_train_batch_end(self, batch: int, logs: dict | None = None) -> None:
         if not (batch + 1) % self.check_every_nth_batch:
             logger.info(f'\nvalidation and checkpoint at batch {batch}')
             self.check_in(batch)
 
-    def freeze_layers(self, model):
+    def freeze_layers(self, model: Model) -> Model:
         # thank you https://github.com/keras-team/keras/issues/13279#issuecomment-527705263
         for i in model.layers:
             i.trainable = False
@@ -75,7 +76,7 @@ class ConfusionMatrixTrain(Callback):
                 self.freeze_layers(i)
         return model
 
-    def check_in(self, batch=None):
+    def check_in(self, batch: int | None = None) -> None:
         _, _, val_genic_f1 = HelixerModel.run_metrics(self.val_generator, self.model, calc_H=self.calc_H)
         if val_genic_f1 > self.best_val_genic_f1:
             self.best_val_genic_f1 = val_genic_f1
@@ -98,7 +99,7 @@ class ConfusionMatrixTrain(Callback):
             self.model.save(path, save_format='h5')
             logger.info(f'saved model at {path}')
 
-    def on_train_end(self, logs=None):
+    def on_train_end(self, logs: dict | None = None) -> None:
         if os.path.isdir(self.large_eval_folder):
             # load best model
             best_model = load_model(self.save_model_path)
@@ -115,16 +116,17 @@ class ConfusionMatrixTrain(Callback):
 
 
 class PreshuffleCallback(Callback):
-    def __init__(self, train_generator):
+    def __init__(self, train_generator: 'HelixerSequence') -> None:
         self.train_generator = train_generator
 
-    def on_epoch_begin(self, epoch, logs=None):
+    def on_epoch_begin(self, epoch: int, logs: dict | None = None) -> None:
         if self.train_generator.shuffle:
             self.train_generator.shuffle_data()
 
 
 class HelixerSequence(Sequence):
-    def __init__(self, model, h5_files, mode, batch_size, shuffle):
+    def __init__(self, model: 'HelixerModel', h5_files: list[h5py.File], mode: str,
+                 batch_size: int, shuffle: bool) -> None:
         assert mode in ['train', 'val', 'test']
         # model != actual model, it's just the default values from HelixerModel,
         # pool_size is now replaced by the one from the actual model
@@ -276,7 +278,7 @@ class HelixerSequence(Sequence):
         y[..., 0] = np.logical_or(y[..., 0], y[..., 1])
         y[..., 1] = 0
 
-    def shuffle_data(self):
+    def shuffle_data(self) -> None:
         start_time = time.time()
         self.data_lists = shuffle(*self.data_lists)
         logger.info(f'Reshuffled {self.mode} data in {time.time() - start_time:.2f} secs')
@@ -313,7 +315,7 @@ class HelixerSequence(Sequence):
 
         return tuple(batch)
 
-    def get_batch_of_one_dataset(self, name, batch_idx):
+    def get_batch_of_one_dataset(self, name: str, batch_idx: int) -> list[np.ndarray]:
         """returns single batch (the Nth where N=batch_idx) from dataset '{name}'"""
         # setup indices based on overlapping or not
         if self.overlap:
@@ -390,7 +392,7 @@ class HelixerSequence(Sequence):
     def _aggregate_timestep_pools(self, matrix, aggr_function=np.mean):
         pass
 
-    def compress_tw(self, transitions):
+    def compress_tw(self, transitions: np.ndarray) -> np.ndarray:
         return self._squish_tw_to_sw(transitions, self.transition_weights, self.stretch_transition_weights)
 
     @staticmethod
@@ -432,7 +434,7 @@ class HelixerSequence(Sequence):
         dilated_rf[i, j] = np.maximum(reshaped_sw_t[i, j], 1)
         return dilated_rf
 
-    def __len__(self):
+    def __len__(self) -> int:
         """how many batches in epoch"""
         if self.debug:
             # if self.debug and self.mode == 'train':
@@ -505,7 +507,7 @@ class HelixerSequence(Sequence):
 
 
 class HelixerModel(ABC):
-    def __init__(self, cli_args=None):
+    def __init__(self, cli_args: list[str] | None = None) -> None:
         self.cli_args = cli_args  # if cli_args is None, the parameters from sys.argv will be used
 
         self.parser = argparse.ArgumentParser()
@@ -584,7 +586,7 @@ class HelixerModel(ABC):
 
         self.coverage_count = None
 
-    def parse_args(self):
+    def parse_args(self) -> None:
         """Parses the arguments either from the command line via argparse by using self.parser or
         takes a list of cli arguments from self.cli_args. This can be used to invoke a HelixerModel from
         another script."""
@@ -641,7 +643,7 @@ class HelixerModel(ABC):
                     if layer['name'] == 'reshape_hat':
                         self.pool_size = layer['config']['target_shape'][1]  # target shape: [-1, pool_size, n_classes]
 
-    def generate_callbacks(self, train_generator):
+    def generate_callbacks(self, train_generator: 'HelixerSequence') -> list[Callback]:
         callbacks = [ConfusionMatrixTrain(self.save_model_path, train_generator, self.gen_validation_data(),
                                           self.large_eval_folder, self.patience, calc_H=self.calculate_uncertainty,
                                           check_every_nth_batch=self.check_every_nth_batch,
@@ -649,7 +651,7 @@ class HelixerModel(ABC):
                      PreshuffleCallback(train_generator)]
         return callbacks
 
-    def set_resources(self):
+    def set_resources(self) -> None:
         gpu_devices = tf.config.experimental.list_physical_devices('GPU')
         for device in gpu_devices:
             tf.config.experimental.set_memory_growth(device, True)
@@ -659,23 +661,24 @@ class HelixerModel(ABC):
             tf.config.set_visible_devices([gpu_devices[self.gpu_id]], 'GPU')
         logger.info(f'GPU devices: {gpu_devices}')
 
-    def gen_training_data(self):
+    def gen_training_data(self) -> 'HelixerSequence':
         SequenceCls = self.sequence_cls()
         return SequenceCls(model=self, h5_files=self.h5_trains, mode='train', batch_size=self.batch_size,
                            shuffle=True)
 
-    def gen_validation_data(self):
+    def gen_validation_data(self) -> 'HelixerSequence':
         SequenceCls = self.sequence_cls()
         return SequenceCls(model=self, h5_files=self.h5_vals, mode='val', batch_size=self.val_test_batch_size,
                            shuffle=False)
 
-    def gen_test_data(self):
+    def gen_test_data(self) -> 'HelixerSequence':
         SequenceCls = self.sequence_cls()
         return SequenceCls(model=self, h5_files=self.h5_tests, mode='test', batch_size=self.val_test_batch_size,
                            shuffle=False)
 
     @staticmethod
-    def run_metrics(generator, model, print_to_stdout=True, calc_H=False):
+    def run_metrics(generator: 'HelixerSequence', model: Model, print_to_stdout: bool = True,
+                    calc_H: bool = False) -> tuple[float, float, float]:
         start = time.time()
         metrics_calculator = Metrics(generator, print_to_stdout=print_to_stdout,
                                      skip_uncertainty=not calc_H)
@@ -687,7 +690,9 @@ class HelixerModel(ABC):
         return genic_metrics['precision'], genic_metrics['recall'], genic_metrics['f1']
 
     @staticmethod
-    def run_large_eval(folder, model, generator, training_species, print_to_stdout=False, calc_H=False):
+    def run_large_eval(folder: str, model: Model, generator: 'HelixerSequence',
+                       training_species: Iterable[str], print_to_stdout: bool = False,
+                       calc_H: bool = False) -> float:
         def print_table(results, table_name, training_species):
             table = [['Name', 'Precision', 'Recall', 'F1-Score']]
             for name, values in results:
@@ -734,34 +739,34 @@ class HelixerModel(ABC):
         return np.median(f1_scores[~in_train])
 
     @abstractmethod
-    def sequence_cls(self):
+    def sequence_cls(self) -> type['HelixerSequence']:
         pass
 
     @abstractmethod
-    def model(self):
+    def model(self) -> Model:
         pass
 
     @abstractmethod
-    def model_hat(self, penultimate_layers):
+    def model_hat(self, penultimate_layers: tuple) -> tf.Tensor:
         pass
 
     @abstractmethod
-    def compile_model(self, model):
+    def compile_model(self, model: Model) -> None:
         pass
 
     @staticmethod
-    def plot_model(model):
+    def plot_model(model: Model) -> None:
         from tensorflow.keras.utils import plot_model
         plot_model(model, to_file='model.png')
         logger.info('Plotted to model.png')
         sys.exit()
 
     @staticmethod
-    def sum_shapes(datasets):
+    def sum_shapes(datasets: list[h5py.Dataset]) -> list[int]:
         shapes = [ds.shape for ds in datasets]
         return [sum(x[0] for x in shapes)] + list(shapes[0][1:])
 
-    def open_data_files(self):
+    def open_data_files(self) -> None:
         def get_n_correct_seqs(h5_files):
             sum_n_correct = 0
             for h5_file in h5_files:
@@ -980,7 +985,7 @@ class HelixerModel(ABC):
             logger.info('Total params: {:,}\n'.format(model.count_params()))
         os.chdir(pwd)  # return to previous directory
 
-    def run(self):
+    def run(self) -> None:
         def load_model_strategy():
             if not self.input_coverage:
                 model = load_model(self.load_model_path)
@@ -1067,7 +1072,7 @@ class HelixerModel(ABC):
             for h5_test in self.h5_tests:
                 h5_test.close()
 
-    def create_train_model(self):
+    def create_train_model(self) -> Model:
         if self.resume_training:
             if not self.fine_tune and not self.fine_tune_resume:
                 model = load_model(self.load_model_path, compile=False)
@@ -1112,14 +1117,14 @@ class HelixerModel(ABC):
             model = self.model()
         return model
 
-    def set_optimizer(self):
+    def set_optimizer(self) -> None:
         if self.optimizer.lower() == 'adam':
             self.optimizer = optimizers.Adam(learning_rate=self.learning_rate, clipnorm=self.clip_norm)
         elif self.optimizer.lower() == 'adamw':
             self.optimizer = AdamW(learning_rate=self.learning_rate, clipnorm=self.clip_norm,
                                    weight_decay=self.weight_decay)
 
-    def insert_coverage_before_hat(self, oldmodel, dense_at):
+    def insert_coverage_before_hat(self, oldmodel: Model, dense_at: int) -> Model:
         """splits input in half, feeds CATG to the main model, and coverage in before tuning layers"""
         # hacking RNAseq coverage in.
         values_per_bp = 4 + self.coverage_count * 2

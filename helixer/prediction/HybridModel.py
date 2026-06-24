@@ -2,6 +2,7 @@
 import tensorflow as tf
 import logging.config
 import sys
+import numpy as np
 from termcolor import colored
 
 from tensorflow.keras.models import Model
@@ -15,10 +16,11 @@ from helixer.core.helpers import get_log_dict
 
 
 class HybridSequence(HelixerSequence):
-    def __init__(self, model, h5_files, mode, batch_size, shuffle):
+    def __init__(self, model: HelixerModel, h5_files: list, mode: str,
+                 batch_size: int, shuffle: bool) -> None:
         super().__init__(model, h5_files, mode, batch_size, shuffle)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
         X, y, sw, transitions, phases, _, coverage_scores = self._generic_get_item(idx)
 
         if self.only_predictions:
@@ -29,16 +31,16 @@ class HybridSequence(HelixerSequence):
 
 @register_keras_serializable()
 class CustomReLU(Layer):
-    def __init__(self, alpha, **kwargs):
+    def __init__(self, alpha: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.alpha = alpha
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return relu(inputs, alpha=self.alpha)
 
 
 class HybridModel(HelixerModel):
-    def __init__(self, cli_args=None):
+    def __init__(self, cli_args: list[str] | None = None) -> None:
         super().__init__(cli_args=cli_args)
         self.parser.add_argument('--cnn-layers', type=int, default=1)
         self.parser.add_argument('--lstm-layers', type=int, default=1)
@@ -51,10 +53,10 @@ class HybridModel(HelixerModel):
         self.parse_args()
 
     @staticmethod
-    def sequence_cls():
+    def sequence_cls() -> type[HybridSequence]:
         return HybridSequence
 
-    def model(self):
+    def model(self) -> Model:
         values_per_bp = 4
         if self.input_coverage:
             values_per_bp += self.coverage_count * 2
@@ -103,7 +105,7 @@ class HybridModel(HelixerModel):
         model = Model(inputs=model_input, outputs=outputs)
         return model
 
-    def model_hat(self, penultimate_layers):
+    def model_hat(self, penultimate_layers: tuple[tf.Tensor, tf.Tensor | None]) -> list[tf.Tensor]:
         x, coverage_input = penultimate_layers
         # maybe concatenate coverage and add one extra dense at this point
         if self.input_coverage:
@@ -131,7 +133,7 @@ class HybridModel(HelixerModel):
 
         return outputs
 
-    def compile_model(self, model):
+    def compile_model(self, model: Model) -> None:
         if self.predict_phase:
             losses = ['categorical_crossentropy', 'categorical_crossentropy']
             loss_weights = [0.8, 0.2]
