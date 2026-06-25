@@ -10,7 +10,7 @@ from helixer.core.data import prioritized_models, fetch_and_organize_models, set
 from helixer.core.helpers import get_log_dict
 
 
-def main(lineage=None, best_only=True, custom_path=None):
+def main(lineage: str | None = None, best_only: bool = True, custom_path: str | None = None) -> None:
     """downloads (best) model(s) for indicated lineage"""
     logger.info('Fetching Helixer models...')
     if best_only:
