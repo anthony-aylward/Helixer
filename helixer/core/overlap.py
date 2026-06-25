@@ -5,9 +5,10 @@
 import numpy as np
 import math
 import sys
+from collections.abc import Iterable
 
 
-def _n_ori_chunks_from_batch_chunks(max_batch_size, overlap_offset, chunk_size):
+def _n_ori_chunks_from_batch_chunks(max_batch_size: int, overlap_offset: int, chunk_size: int) -> int:
     """check max number of original (non overlapped) chunks that fit in overlapped batch_size (or remaining)"""
     # this is going to be empirical for A simplicity and B maintainability
     end = 0
@@ -23,8 +24,9 @@ def _n_ori_chunks_from_batch_chunks(max_batch_size, overlap_offset, chunk_size):
 
 class SubBatch:
 
-    def __init__(self, h5_indices, edge_handle_start, edge_handle_end, is_plus_strand,
-                 overlap_offset, chunk_size, keep_start=None, keep_end=None):
+    def __init__(self, h5_indices: tuple[int, ...], edge_handle_start: bool, edge_handle_end: bool,
+                 is_plus_strand: bool, overlap_offset: int, chunk_size: int,
+                 keep_start: int | None = None, keep_end: int | None = None) -> None:
         self.h5_indices = h5_indices
         # the following parameters are primarily for debugging
         self.keep_start = keep_start
@@ -40,7 +42,7 @@ class SubBatch:
         self.sliding_coordinates = self._mk_sliding_coordinates()
         self.sub_batch_size = len(self.sliding_coordinates)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         sstr, estr = '(', ')'
 
         if self.edge_handle_end:
@@ -51,10 +53,10 @@ class SubBatch:
         return 'SubBatch, {}edges{}, h5 indices: {}'.format(sstr, estr, self.h5_indices)
 
     @property
-    def seq_length(self):
+    def seq_length(self) -> int:
         return self.chunk_size * len(self.h5_indices)
 
-    def _mk_sliding_coordinates(self):
+    def _mk_sliding_coordinates(self) -> tuple[tuple[int, int], ...]:
         out = []
         for i in range(0, self.seq_length - self.chunk_size + 1, self.overlap_offset):
             out.append((i, i + self.chunk_size))
@@ -68,14 +70,14 @@ class SubBatch:
             out.append((self.seq_length - self.chunk_size, self.seq_length))
         return tuple(out)
 
-    def mk_sliding_overlaps_for_data_sub_batch(self, data_sub_batch):
+    def mk_sliding_overlaps_for_data_sub_batch(self, data_sub_batch: np.ndarray) -> list[np.ndarray]:
         """makes sliding window of input data (x, or coverage data)"""
         # combine first 2 dimensions (i.e. merge chunks)
         dat = data_sub_batch.reshape([np.prod(data_sub_batch.shape[:2])] + list(data_sub_batch.shape[2:]))
         sliding_dat = [dat[start:end] for start, end in self.sliding_coordinates]
         return sliding_dat
 
-    def _overlap_preds(self, preds, core_length):
+    def _overlap_preds(self, preds: np.ndarray, core_length: int) -> np.ndarray:
         """take sliding-window predictions, and overlap (w/end clipping) to generate original coordinate predictions"""
         trim_by = (self.chunk_size - core_length) // 2
         ydim = preds[0].shape[-1]
@@ -106,7 +108,7 @@ class SubBatch:
         preds_out = preds_out.reshape((len(self.h5_indices), self.chunk_size, ydim))
         return preds_out
 
-    def overlap_and_edge_handle_preds(self, preds, core_length):
+    def overlap_and_edge_handle_preds(self, preds: np.ndarray, core_length: int) -> np.ndarray:
         """overlaps sliding predictions, then crops as necessary on edges"""
         # the final sequences for what is cropped will come from previous/next batch instead
         # i.e. this should produce identical output regardless of batch size
@@ -115,7 +117,7 @@ class SubBatch:
         clean_preds = self.edge_handle(clean_preds)
         return clean_preds
 
-    def edge_handle(self, dat):
+    def edge_handle(self, dat: np.ndarray) -> np.ndarray:
         """crops first and second array from output unless at sequence edge"""
         if not self.edge_handle_start:
             dat = dat[1:]
@@ -127,7 +129,8 @@ class SubBatch:
 # places where overlap will affect core functionality of HelixerSequence
 class OverlapSeqHelper(object):
     """handles overlap-ready batching, as well as overlap-prep and overlapping there-of"""
-    def __init__(self, contiguous_ranges, chunk_size, max_batch_size, overlap_offset, core_length):
+    def __init__(self, contiguous_ranges: Iterable[dict], chunk_size: int, max_batch_size: int,
+                 overlap_offset: int, core_length: int) -> None:
         # check validity of settings
         self.max_batch_size = max_batch_size
         self.core_length = core_length
@@ -144,7 +147,8 @@ class OverlapSeqHelper(object):
                                                         chunk_size=chunk_size,
                                                         overlap_offset=overlap_offset)
 
-    def _mk_sliding_batches(self, contiguous_ranges, chunk_size, overlap_offset):
+    def _mk_sliding_batches(self, contiguous_ranges: Iterable[dict], chunk_size: int,
+                            overlap_offset: int) -> list[list[SubBatch]]:
         # max_n_chunks is the number of chunks that will go into overlapping
         # before any sliding window, before any dropping or clipping
         max_n_chunks = _n_ori_chunks_from_batch_chunks(self.max_batch_size, overlap_offset, chunk_size)
@@ -191,11 +195,11 @@ class OverlapSeqHelper(object):
         sliding_batches.append(batch)
         return sliding_batches
 
-    def adjusted_epoch_length(self):
+    def adjusted_epoch_length(self) -> int:
         """number of batches per epoch (given that we're overlapping)"""
         return len(self.sliding_batches)
 
-    def h5_indices_of_batch(self, batch_idx):
+    def h5_indices_of_batch(self, batch_idx: int) -> np.ndarray:
         """concatenate indices from sub batches to give all indices for the batch at {batch_idx}"""
         sub_batches = self.sliding_batches[batch_idx]
         h5_indices = []
@@ -203,7 +207,7 @@ class OverlapSeqHelper(object):
             h5_indices += sb.h5_indices
         return np.array(h5_indices)
 
-    def make_input(self, batch_idx, data_batch):
+    def make_input(self, batch_idx: int, data_batch: np.ndarray) -> np.ndarray:
         """make sliding input for prediction and overlapping (i.e. for X, maybe also for coverage)"""
         sub_batches = self.sliding_batches[batch_idx]
         sb_input_lengths = [len(sb.h5_indices) for sb in sub_batches]
@@ -214,7 +218,7 @@ class OverlapSeqHelper(object):
         sliding_input = np.concatenate(x_as_list)
         return sliding_input
 
-    def overlap_predictions(self, batch_idx, predictions):
+    def overlap_predictions(self, batch_idx: int, predictions: np.ndarray) -> np.ndarray:
         """overlapping of sliding predictions to regenerate original dimensions"""
         sub_batches = self.sliding_batches[batch_idx]
         sub_batch_lengths = [sb.sub_batch_size for sb in sub_batches]
@@ -230,7 +234,7 @@ class OverlapSeqHelper(object):
                                          f'sub batches: {sub_batches})'
         return out
 
-    def subset_input(self, batch_idx, y_true_or_sw):
+    def subset_input(self, batch_idx: int, y_true_or_sw: np.ndarray) -> np.ndarray:
         """generate subset from data corresponding to _final_ predictions, i.e. to run y_true through during eval"""
         sub_batches = self.sliding_batches[batch_idx]
         sb_input_lengths = [len(sb.h5_indices) for sb in sub_batches]

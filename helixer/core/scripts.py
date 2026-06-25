@@ -13,13 +13,14 @@ class ParameterParser(ABC):
     """Bundles code that parses script parameters from the command line and a config file."""
 
     def __init__(self, config_file_path=''):
-        # Do NOT use default values in the argparse configuration but specify them seperately later
+        # Do NOT use default values in the argparse configuration but specify them separately later
         # (except for the config file itself)
         # This is needed to give the cli parameters precedent over the ones in the config file
         self.parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
         self.io_group = self.parser.add_argument_group("Data input and output")
         self.io_group.add_argument('--config-path', type=str, default=config_file_path,
-                              help='Config in form of a YAML file with lower priority than parameters given on the command line.')
+                              help='Config in form of a YAML file with lower priority than parameters given on '
+                                   'the command line.')
 
         self.data_group = self.parser.add_argument_group("Data generation parameters")
         self.data_group.add_argument('--compression', type=str, choices=['gzip', 'lzf'],
@@ -27,8 +28,8 @@ class ParameterParser(ABC):
                                           'files with a fixed compression level of 4. '
                                           '(Default is "gzip", which is much slower than "lzf".)')
         self.data_group.add_argument('--no-multiprocess', action='store_true',
-                                     help='Whether to not parallize the numerification of large sequences. Uses half the memory '
-                                          'but can be much slower when many CPU cores can be utilized.')
+                                     help='Whether to not parallize the numerification of large sequences. Uses half'
+                                          'the memory but can be much slower when many CPU cores can be utilized.')
         self.parser.add_argument('--version', action='version', version='%(prog)s ' + version('helixer'))
         # Default values have to be specified - and potentially added - here
         self.defaults = {'compression': 'gzip', 'no_multiprocess': False}

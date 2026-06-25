@@ -14,7 +14,7 @@ MODEL_LIST = 'model_list.csv'
 logger = logging.getLogger('HelixerLogger')
 
 
-def set_model_path(custom_path):
+def set_model_path(custom_path: str | None) -> str:
     if custom_path is not None:
         assert os.path.exists(custom_path), \
             f"the custom directory {custom_path} for downloading Helixer's models does not exist"
@@ -22,7 +22,7 @@ def set_model_path(custom_path):
     return MODEL_PATH
 
 
-def fetch_and_organize_models(priority_models, model_path):
+def fetch_and_organize_models(priority_models: list[dict], model_path: str) -> None:
     """downloads current best models to Helixer's user data directory"""
 
     # main model directory
@@ -49,7 +49,7 @@ def fetch_and_organize_models(priority_models, model_path):
         f.write(r.content)
 
 
-def prioritized_models(lineage, model_path):
+def prioritized_models(lineage: str | None, model_path: str) -> list[dict]:
     """get priority sorted list of available models for lineage"""
     model_list_url = MODEL_LIST_URL
 
@@ -82,7 +82,7 @@ def prioritized_models(lineage, model_path):
     return sorted(models, key=lambda m: m['priority'])
 
 
-def identify_current(lineage, prioritized, model_path):
+def identify_current(lineage: str, prioritized: list[dict], model_path: str) -> str | None:
     """identify which pre-downloaded model has the highest priority / should be used"""
     prioritized_dict = {x['model_file_name']: x for x in prioritized}
     current_models = os.listdir(os.path.join(model_path, lineage))
@@ -104,7 +104,7 @@ def identify_current(lineage, prioritized, model_path):
         return None
 
 
-def report_if_current_not_best(prioritized, current):
+def report_if_current_not_best(prioritized: list[dict], current: str | None) -> None:
     if current is None:
         print('Error: Cannot continue without a model, either download models with `fetch_helixer_models.py`'
               'or set --model-filepath in Helixer.py', file=sys.stderr)

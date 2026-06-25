@@ -1,14 +1,16 @@
+import h5py
 import numpy as np
 import logging
 import sys
+from collections.abc import Iterator, Sequence
 
 # some helpers for handling / sorting / or checking sort of our h5 files
-def mk_seqonly_keys(h5):
+def mk_seqonly_keys(h5: h5py.File) -> list[bytes]:
     return [a + b for a, b in zip(h5['data/species'],
                                   h5['data/seqids'])]
 
 
-def mk_keys(h5, flip=False):
+def mk_keys(h5: h5py.File, flip: bool = False) -> Iterator[tuple[bytes, bytes, int, int]]:
     first_idx = 0
     second_idx = 1
     if flip:
@@ -19,7 +21,7 @@ def mk_keys(h5, flip=False):
                h5['data/start_ends'][:, second_idx])
 
 
-def get_sp_seq_ranges(h5):
+def get_sp_seq_ranges(h5: h5py.File) -> dict[bytes, dict]:
     # dict with {sp: {"start: N,
     #                 "end": N,
     #                 "seqids": {seqid: [start, end], seqid2: [start2, end2], ...}},
@@ -54,7 +56,7 @@ def get_sp_seq_ranges(h5):
 
 # additional helping functions for predictions to hints, here so they can be tested
 # also probably some redundancy with above to clean up (-_-)
-def get_contiguous_ranges(h5):
+def get_contiguous_ranges(h5: h5py.File) -> Iterator[dict[str, bytes | bool | int]]:
     """gets h5 coordinates for same species, sequence and strand AKA end to end across a chromosome/scaffold"""
     start_ends = h5['data/start_ends'][:]
     marks_unique = np.stack((h5['data/seqids'], h5['data/species'], start_ends[:, 1] > start_ends[:, 0]))
@@ -75,7 +77,8 @@ def get_contiguous_ranges(h5):
                "end_i": indexes[i] + lengths[i]}
 
 
-def read_in_chunks(preds, data, start_i, end_i, step=100):
+def read_in_chunks(preds: h5py.File, data: h5py.File, start_i: int, end_i: int,
+                   step: int = 100) -> Iterator[tuple[np.ndarray, int, int]]:
     for i in range(start_i, end_i, step):
         ei = min(i + step, end_i)
         pred_chunk = preds['predictions'][i:ei]
@@ -92,7 +95,8 @@ def read_in_chunks(preds, data, start_i, end_i, step=100):
         yield pred_chunk, start, end
 
 
-def find_confident_single_class_regions(pred_chunk, pad=5):
+def find_confident_single_class_regions(pred_chunk: np.ndarray,
+                                        pad: int = 5) -> Iterator[tuple[int, int]]:
     """find start, end (relative to pred_chunk) bits where in-between is confidently one class"""
     # in the event of a seamless class swap [1,0,0,0] -> [0,1,0,0]
     # and of a thin-seemed swap [1,0,0,0] -> [0.5,0.5,0,0] -> [0,1,0,0]
@@ -122,7 +126,9 @@ def find_confident_single_class_regions(pred_chunk, pad=5):
         yield lowconf_idx[-1] + 1, pred_chunk.shape[0]
 
 
-def divvy_by_confidence(one_class_chunk, step_key, pad=5, stability_threshold=0.1):
+def divvy_by_confidence(one_class_chunk: np.ndarray, step_key: Sequence[tuple[int, int]],
+                        pad: int = 5,
+                        stability_threshold: float = 0.1) -> Iterator[dict[str, int | float]]:
     """breaks down contiguous 1-class region to pre-hints with semi-consistent confidence"""
     main_class = np.argmax(one_class_chunk[0])
     min_step, max_size = step_key[main_class]
@@ -150,13 +156,13 @@ def divvy_by_confidence(one_class_chunk, step_key, pad=5, stability_threshold=0.
             cdiff_at_last_yield = cumulative_diffs[end]
 
 
-def file_stem(path):
+def file_stem(path: str) -> str:
     """Returns the file name without extension"""
     import os
     return os.path.basename(path).split('.')[0]
 
 
-def get_log_dict():
+def get_log_dict() -> dict:
     return {
         "version": 1,
         "disable_existing_loggers": False,
