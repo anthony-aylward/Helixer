@@ -1,6 +1,15 @@
 # Helixer tests
 Run all tests from the `Helixer/helixer` directory.
 
+## Dependency checks — `test_imports.py`
+Verifies that all required Python packages (`helixer`, `geenuff`, `dustdas`) are importable
+and that the `helixer_post_bin` binary is on PATH. Run this first after a fresh install to
+get actionable error messages for missing dependencies.
+
+```bash
+pytest --verbose tests/test_imports.py
+```
+
 ## Unit tests — `test_helixer.py`
 Covers numerification, annotation encoding, sequence slicing, overlap processing,
 confusion matrix computation, and coverage utilities. No model files or external

@@ -194,7 +194,7 @@ def main() -> None:
         print(colored(f'\nError: {helixer_post_bin} not found in $PATH, this is required for Helixer.py to complete.\n',
                       'red'),
               file=sys.stderr)
-        print('Installation instructions: https://github.com/TonyBolger/HelixerPost, the lzf library is OPTIONAL',
+        print('Installation instructions: https://github.com/usadellab/HelixerPost, the lzf library is OPTIONAL',
               file=sys.stderr)
         print('Remember to add the compiled binary to a folder in your PATH variable.', file=sys.stderr)
         sys.exit(1)

@@ -149,7 +149,7 @@ The three main steps the command above executes can also be run separately:
 - [fasta2h5.py](fasta2h5.py): conversion of the DNA sequence to numerical matrices
 - [HybridModel.py](helixer/prediction/HelixerModel.py): prediction of base-wise
 probabilities with the Deep Learning based model defined/programmed in this file
-- [helixer_post_bin](https://github.com/TonyBolger/HelixerPost) (part of another
+- [helixer_post_bin](https://github.com/usadellab/HelixerPost) (part of another
 repository): post-processing into primary gene models
 
 Explanations for the parameters used in this example can be found

@@ -35,7 +35,7 @@ The steps below assume you are working in the same environment.
 
 ### Post processor
 
-https://github.com/TonyBolger/HelixerPost
+https://github.com/usadellab/HelixerPost
 
 Setup according to included instructions and
 further add the compiled `helixer_post_bin` to 
@@ -62,12 +62,29 @@ pip install .  # or `pip install -e .`, if you will be changing the code
 ```
 
 #### Test Helixer
-Helixer comes with test data and unit tests.
+Helixer comes with test data and several test suites. All must be run from the
+`Helixer/helixer` subdirectory.
+
 ```bash
-# switch to the Helixer code subdirectory
 cd Helixer/helixer
-# run the unit tests
+```
+
+| Test file             | What it tests                                                                                                        | When to run                                                                      |
+|:----------------------|:---------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
+| `test_imports.py`     | If all required Python packages importable; `helixer_post_bin` on PATH or inside the virtual environments bin folder | First, after any fresh install                                                   |
+| `test_helixer.py`     | Unit tests: numerification, encoding, overlap, confusion matrix                                                      | Always; no model or external binary required                                     |
+| `test_integration.py` | End-to-end CLI pipeline: h5 export, prediction, GFF3 output, 1- vs 3-step equivalence                                | After install with a model and `helixer_post_bin`                                |
+| `test_training.py`    | Full training workflow: download, export, train, tune, eval                                                          | For developers; requires a network connection for downloading test files and GPU |
+
+```bash
+# check dependencies first
+pytest --verbose tests/test_imports.py
+# run unit tests (no model required)
 pytest --verbose tests/test_helixer.py
+# run integration tests (requires helixer_post_bin and a land_plant model in either the default
+# location (~/.local/share/Helixer/models/land_plant/<model>.h5 used by fetch_helixer_models.py)
+# or given via --helixer-model-path /path/to/model.h5)
+pytest --verbose tests/test_integration.py
 ```
 
 ### GPU requirements (optional, but highly recommended for realistically sized datasets)
