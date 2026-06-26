@@ -532,7 +532,7 @@ class HelixerModel(ABC):
         self.parser.add_argument('--coverage-offset', type=float, default=0.0, help=argparse.SUPPRESS)
         self.parser.add_argument('--calculate-uncertainty', action='store_true', help=argparse.SUPPRESS)
         self.parser.add_argument('--no-utrs', action='store_true', help=argparse.SUPPRESS)  # is this still needed?
-        self.parser.add_argument('--predict-phase', action='store_true')
+
         self.parser.add_argument('--load-predictions', action='store_true', help=argparse.SUPPRESS)  # bc no models that can use this are available
         self.parser.add_argument('--resume-training', action='store_true')
         # testing / predicting
@@ -604,6 +604,7 @@ class HelixerModel(ABC):
                 args[arg] = default
 
         self.__dict__.update(args)
+        self.predict_phase = True
 
         self.testing = bool(self.load_model_path and not self.resume_training)
         self.only_predictions = (self.testing and not self.eval)  # do only load X in this case
@@ -885,7 +886,7 @@ class HelixerModel(ABC):
             if isinstance(predictions, list):
                 # when we have two outputs, one is for phase
                 # is dependent on the model with which you predict for Helixer.py
-                # so even though we don't pass in --predict-phase as true, it gets predicted
+                # phase is always predicted when the model has two output heads
                 output_names = ['predictions', 'predictions_phase']
             else:
                 # if we just had one output

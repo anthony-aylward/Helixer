@@ -123,14 +123,14 @@ example
 Now we use the datasets in `example/train/` to train a model with our 
 LSTM architecture for 5 epochs and save the best iteration 
 (according to the Genic F1 on the validation dataset) to 
-`example/best_helixer_model.h5`. The parameter `--predict-phase`
-is necessary so that the resulting models are compatible with post-processing
-via HelixerPost. For a detailed explanation of all possible parameters see the
+`example/best_helixer_model.h5`. Phase prediction is always enabled,
+ensuring compatibility with post-processing via HelixerPost.
+For a detailed explanation of all possible parameters see the
 [Helixer options documentation](helixer_options.md#3-hybridmodelpy-options).
 
 ```shell script
 HybridModel.py --data-dir example/train/ --save-model-path example/best_helixer_model.h5 \
-  --epochs 5 --predict-phase
+  --epochs 5
 ```
 > **Hint**: Multi-GPU training works by using all GPUs available on your machine. To restrict
 > Helixer in training (and eval) mode to only use one GPU, you can provide the ID of the GPU that
@@ -150,7 +150,7 @@ in hyperparameter optimization runs is:
 # done on RTX 8000s with 48GB of ram, and there we could set `--batch-size 240 --val-test-batch-size 480`
 # for otherwise comparable hyperparameters
 HybridModel.py -v --pool-size 9 --batch-size 50 --val-test-batch-size 100 \
-  --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]" --predict-phase \
+  --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]" \
   --lstm-layers 3 --cnn-layers 4 --units 128 --filter-depth 96 --kernel-size 10 \
   --data-dir example/train/ --save-model-path example/fullsize_helixer_model.h5
 ```
@@ -180,7 +180,7 @@ Or we can directly evaluate the predictive performance of our model.
 ```shell script
 HybridModel.py --load-model-path example/best_helixer_model.h5 \
   --test-data example/h5s/Ostreococcus_lucimarinus/test_data.h5 \
-  --predict-phase --eval
+  --eval
 ```
 
 The last command can be sped up with a higher batch size and should give us the same break down that is performed 

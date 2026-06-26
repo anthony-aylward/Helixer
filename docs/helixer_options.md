@@ -89,7 +89,6 @@ command line.
 | --weight-decay          | 3.5e-5    | Weight decay for training; penalizes complexity and prevents overfitting                                                                                                                                                     |
 | --class-weights         | /         | Weighting of the 4 classes [intergenic, UTR, CDS, Intron] (Helixer predictions)                                                                                                                                              |
 | --transition-weights    | /         | Weighting of the 6 transition categories [transcription start site, start codon, donor splice site, transcription stop site, stop codon, acceptor splice site]                                                               |
-| --predict-phase         | False     | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
 | --resume-training       | False     | Add this to resume training (pretrained model checkpoint necessary)                                                                                                                                                          |
 
 ### Testing/Predicting parameters

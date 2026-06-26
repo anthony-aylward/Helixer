@@ -173,7 +173,7 @@ fasta2h5.py --species Arabidopsis_lyrata --h5-output-path Arabidopsis_lyrata.h5 
 # improve prediction quality at subsequence ends by creating and overlapping 
 # sliding-window predictions.)
 HybridModel.py --load-model-path $HOME/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5 \
-     --test-data Arabidopsis_lyrata.h5 --overlap --val-test-batch-size 32 -v --predict-phase
+     --test-data Arabidopsis_lyrata.h5 --overlap --val-test-batch-size 32 -v
 
 # order of input parameters:
 # helixer_post_bin <genome.h5> <predictions.h5> <window_size> <edge_threshold> <peak_threshold> <min_coding_length> <output.gff3>
@@ -203,7 +203,6 @@ the transcriptome, using a standard parser, for instance [gffread](https://githu
 | --overlap             | False   | Add to improve prediction quality at subsequence ends by creating and overlapping sliding-window predictions (with proportional increase in time usage).                                                                     |
 | --val-test-batch-size | 32      | Batch size for validation/test data                                                                                                                                                                                          |
 | -v/--verbose          | False   | Add to run HybridModel.py in verbosity mode (additional information will be printed)                                                                                                                                         |
-| --predict-phase       | False   | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
 ###### helixer_post_bin
 (positional arguments, not specified via name but order)   
    
