@@ -312,7 +312,7 @@ def test_minus_strand_numerify() -> None:
 def test_coord_numerifier_and_h5_gen_plus_strand() -> None:
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     x = f['/data/X'][:]
@@ -359,7 +359,7 @@ def test_coord_numerifier_and_h5_gen_minus_strand() -> None:
     """Tests numerification of test case 8 on coordinate 2"""
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=200, one_hot=False, longest_only=False)
+    controller.export(chunk_size=200, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     x = f['/data/X'][:]
@@ -823,7 +823,7 @@ def test_gene_lengths() -> None:
     """Tests the '/data/gene_lengths' array"""
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=5000, one_hot=True, longest_only=False)
+    controller.export(chunk_size=5000, write_by=21_384_000_000, one_hot=True, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     gl = f['/data/gene_lengths']
@@ -864,7 +864,7 @@ def test_gene_lengths() -> None:
 
 def test_seqids_start_ends() -> None:
     _, controller, _ = setup_dummyloci()
-    controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     seqids = f['/data/seqids'][:]
@@ -911,7 +911,7 @@ def test_phases() -> None:
 
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=5000, one_hot=True, longest_only=True)
+    controller.export(chunk_size=5000, write_by=21_384_000_000, one_hot=True, longest_only=True)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     ph = f['/data/phases'][:]
@@ -1449,7 +1449,7 @@ def test_direct_fasta_export() -> None:
 
     _, geenuff_controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    geenuff_controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    geenuff_controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     h5_fasta = h5py.File(FASTA_OUT_FILE, 'r')
     h5_db = h5py.File(H5_OUT_FILE, 'r')

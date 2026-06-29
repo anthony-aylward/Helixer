@@ -76,7 +76,7 @@ def geenuff_h5(tmp_dir: pathlib.Path, geenuff_db: str) -> str:
     """Export the geenuff database to h5 via the Python API."""
     h5_path = f'{tmp_dir}/geenuff.h5'
     controller = HelixerExportController(geenuff_db, h5_path)
-    controller.export(chunk_size=CHUNK_SIZE, one_hot=True, longest_only=False)
+    controller.export(chunk_size=CHUNK_SIZE, write_by=21_384_000_000, one_hot=True, longest_only=False)
     return h5_path
 
 

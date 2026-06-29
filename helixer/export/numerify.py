@@ -362,9 +362,9 @@ class CoordNumerifier(object):
         return res
 
     @staticmethod
-    def numerify_only_fasta(coord: object, max_len: int, genome: str, one_hot: bool = True,
-                            use_multiprocess: bool = False,
-                            write_by: int = 20000000) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
+    def numerify_only_fasta(coord: object, max_len: int, genome: str, write_by: int,
+                            one_hot: bool = True,
+                            use_multiprocess: bool = False) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
         """export the FASTA sequence only"""
         # passing empty features causes SplitFinder to consider noting more than splitting
         # to max length of write_by and end of sequence handling.
@@ -384,9 +384,9 @@ class CoordNumerifier(object):
                 yield tuple(out), h5_coord[strand]
 
     @staticmethod
-    def numerify(coord: object, coord_features: list, max_len: int, one_hot: bool = True,
+    def numerify(coord: object, coord_features: list, max_len: int, write_by: int,
+                 one_hot: bool = True,
                  mode: tuple[str, ...] = ('X', 'y', 'anno_meta', 'transitions'),
-                 write_by: int = 5000000,
                  use_multiprocess: bool = True) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
         assert isinstance(max_len, int) and max_len > 0, 'what is {} of type {}'.format(max_len, type(max_len))
         coord_features = sorted(coord_features, key=lambda f: min(f.start, f.end))  # sort by ~ +strand start

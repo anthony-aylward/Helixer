@@ -190,8 +190,8 @@ class HelixerExportController(HelixerExportControllerBase):
                         write_by: int, modes: tuple[str, ...],
                         multiprocess: bool) -> Iterator[tuple[tuple[MatAndInfo, ...], object, float, float, tuple[int, int]]]:
         """filtering and stats"""
-        coord_data_gen = CoordNumerifier.numerify(coord, coord_features, chunk_size, one_hot,
-                                                  write_by=write_by, mode=modes, use_multiprocess=multiprocess)
+        coord_data_gen = CoordNumerifier.numerify(coord, coord_features, chunk_size, write_by,
+                                                  one_hot=one_hot, mode=modes, use_multiprocess=multiprocess)
         # the following will all be used to calculated a percentage, which is yielded but ignored until the end
         n_chunks = n_bases = n_ig_bases = n_masked_bases = 0
 
@@ -214,8 +214,7 @@ class HelixerExportController(HelixerExportControllerBase):
 
             yield coord_data, coord, masked_bases_perc, ig_bases_perc, h5_coord
 
-    def export(self, chunk_size: int, one_hot: bool = True, longest_only: bool = True,
-               write_by: int = 10_000_000_000,
+    def export(self, chunk_size: int, write_by: int, one_hot: bool = True, longest_only: bool = True,
                modes: tuple[str, ...] = ('X', 'y', 'anno_meta', 'transitions'),
                compression: str = 'gzip', multiprocess: bool = True) -> int:
         coords_features = self.exporter.genome_query(longest_only=longest_only)

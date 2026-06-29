@@ -15,12 +15,14 @@ if __name__ == '__main__':
                              help='Fasta input file for direct FASTA to .h5 file conversion.')
     pp.io_group.add_argument('--species', type=str, default='', required=True,
                              help='Species name. Will be added to the .h5 file.')
-    pp.data_group.add_argument('--subsequence-length', type=int, default=21384,
+    pp.data_group.add_argument('--subsequence-length', type=int,
                                help='Size of the chunks each genomic sequence gets cut into. (Default is 21384.)')
-    pp.data_group.add_argument('--write-by', type=int, default=20_000_000,
+    pp.data_group.add_argument('--write-by', type=int,
                                help='write in super-chunks with this many base pairs, which will be rounded to be '
                                     'divisible by subsequence-length; needs to be equal to or larger than subsequence '
                                     'length; for lower memory consumption, consider setting a lower number')
+    pp.defaults['subsequence_length'] = 21384
+    pp.defaults['write_by'] = 20_000_000
     args = pp.get_args()
     logging.config.dictConfig(get_log_dict())
     logger = logging.getLogger('HelixerLogger')
