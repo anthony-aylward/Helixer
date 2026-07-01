@@ -24,7 +24,6 @@ import pytest
 from geenuff.applications.importer import ImportController
 from helixer.export.exporter import HelixerExportController, HelixerFastaToH5Controller
 
-# ---------------------------------------------------------------------------
 # Paths and constants
 # ---------------------------------------------------------------------------
 
@@ -177,7 +176,8 @@ def fasta2h5_result(tmp_dir: pathlib.Path) -> tuple[str, subprocess.CompletedPro
 
 
 @pytest.fixture(scope='session')
-def hybrid_preds_result(tmp_dir: pathlib.Path, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]], model_path: str) -> tuple[str, subprocess.CompletedProcess[str]]:
+def hybrid_preds_result(tmp_dir: pathlib.Path, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]],
+                        model_path: str) -> tuple[str, subprocess.CompletedProcess[str]]:
     """Run HybridModel.py on the fasta2h5 output; return (preds_h5_path, CompletedProcess)."""
     fasta_h5_path, _ = fasta2h5_result
     preds_path = f'{tmp_dir}/hybrid_preds.h5'
@@ -303,11 +303,10 @@ class TestH5Structure:
             assert f['data/y'].shape[2] == 4
 
 
-# ---------------------------------------------------------------------------
-# H5 content validity — mini_test_data (generated via Python API in this test run)
+# H5 content validity - mini_test_data (generated via Python API in this test run)
 # ---------------------------------------------------------------------------
 
-class TestH5Contentmini_test_data:
+class TestH5ContentMiniTestDataGenerated:
     """Verify that the exported h5 content obeys the encoding contracts."""
 
     def test_x_rows_sum_to_one(self, geenuff_h5: str) -> None:
@@ -340,11 +339,10 @@ class TestH5Contentmini_test_data:
         assert np.isin(sw, [0, 1]).all()
 
 
-# ---------------------------------------------------------------------------
-# H5 content validity — mini_test_data.h5 (real genome data, committed to repo)
+# H5 content validity - mini_test_data.h5 (real genome data, committed to repo)
 # ---------------------------------------------------------------------------
 
-class TestH5ContentMiniTestData:
+class TestH5ContentMiniTestDataRepo:
     """Same encoding contracts, applied to the real-genome file committed to testdata/.
 
     These tests catch format regressions that would not be visible from the
@@ -374,8 +372,7 @@ class TestH5ContentMiniTestData:
         assert np.isin(sw, [0, 1]).all()
 
 
-# ---------------------------------------------------------------------------
-# FASTA → H5 sequence integrity
+# FASTA -> H5 sequence integrity
 # ---------------------------------------------------------------------------
 
 class TestFastaSequenceIntegrity:
@@ -407,12 +404,11 @@ class TestFastaSequenceIntegrity:
         assert mismatches == 0, f'{mismatches} X chunks differ between geenuff and FASTA exports'
 
 
-# ---------------------------------------------------------------------------
 # Prediction probability validity
 # ---------------------------------------------------------------------------
 
 class TestPredictionValidity:
-    """Checks on mini_test_preds.h5 — committed real predictions from a trained model."""
+    """Checks on mini_test_preds.h5 - committed real predictions from a trained model."""
 
     def test_predictions_sum_to_one(self) -> None:
         """Softmax outputs must sum to 1 per non-padding base position.
@@ -455,7 +451,6 @@ class TestPredictionValidity:
             assert f['predictions'].shape[2] == 4
 
 
-# ---------------------------------------------------------------------------
 # GFF3 generation and format validity
 # ---------------------------------------------------------------------------
 
@@ -509,7 +504,6 @@ class TestGFF3Validity:
                 )
 
 
-# ---------------------------------------------------------------------------
 # fasta2h5.py CLI (step 1 of 3-step inference)
 # ---------------------------------------------------------------------------
 
@@ -535,7 +529,8 @@ class TestFasta2h5CLI:
             for key in FASTA2H5_REQUIRED_KEYS:
                 assert key in f, f'missing key: {key}'
 
-    def test_x_has_four_nucleotide_channels(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_x_has_four_nucleotide_channels(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]]
+                                            ) -> None:
         h5_path, _ = fasta2h5_result
         with h5py.File(h5_path, 'r') as f:
             assert f['data/X'].shape[2] == 4
@@ -555,7 +550,6 @@ class TestFasta2h5CLI:
         assert np.allclose(non_padded.sum(axis=-1), 1.0, atol=1e-4)
 
 
-# ---------------------------------------------------------------------------
 # HybridModel.py prediction (step 2 of 3-step inference)
 # ---------------------------------------------------------------------------
 
@@ -578,12 +572,15 @@ class TestHybridModelPrediction:
         with h5py.File(preds_path, 'r') as f:
             assert 'predictions' in f
 
-    def test_predictions_have_four_classes(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_predictions_have_four_classes(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]
+                                           ) -> None:
         preds_path, _ = hybrid_preds_result
         with h5py.File(preds_path, 'r') as f:
             assert f['predictions'].shape[2] == 4
 
-    def test_predictions_chunk_count_matches_input(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]], hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_predictions_chunk_count_matches_input(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]],
+                                                   hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]
+                                                   ) -> None:
         fasta_h5_path, _ = fasta2h5_result
         preds_path, _ = hybrid_preds_result
         with h5py.File(fasta_h5_path, 'r') as f_in:
@@ -592,7 +589,9 @@ class TestHybridModelPrediction:
             n_preds = f_preds['predictions'].shape[0]
         assert n_preds == n_input
 
-    def test_predictions_chunk_length_matches_input(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]], hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_predictions_chunk_length_matches_input(self, fasta2h5_result: tuple[str, subprocess.CompletedProcess[str]],
+                                                    hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]
+                                                    ) -> None:
         fasta_h5_path, _ = fasta2h5_result
         preds_path, _ = hybrid_preds_result
         with h5py.File(fasta_h5_path, 'r') as f_in:
@@ -601,12 +600,14 @@ class TestHybridModelPrediction:
             preds_len = f_preds['predictions'].shape[1]
         assert preds_len == input_len
 
-    def test_predictions_phase_key_present(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_predictions_phase_key_present(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]
+                                           ) -> None:
         preds_path, _ = hybrid_preds_result
         with h5py.File(preds_path, 'r') as f:
             assert 'predictions_phase' in f
 
-    def test_predictions_in_unit_interval(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_predictions_in_unit_interval(self, hybrid_preds_result: tuple[str, subprocess.CompletedProcess[str]]
+                                          ) -> None:
         preds_path, _ = hybrid_preds_result
         with h5py.File(preds_path, 'r') as f:
             preds = f['predictions'][:]
@@ -615,7 +616,6 @@ class TestHybridModelPrediction:
         assert preds_phase.min() >= 0.0 and preds_phase.max() <= 1.0
 
 
-# ---------------------------------------------------------------------------
 # Helixer.py end-to-end (1-step inference)
 # ---------------------------------------------------------------------------
 
@@ -638,7 +638,8 @@ class TestHelixerPyCLI:
         gff3, _ = helixer_gff3
         assert os.path.getsize(gff3) > 0
 
-    def test_gff3_data_lines_have_nine_columns(self, helixer_gff3: tuple[str, subprocess.CompletedProcess[str]]) -> None:
+    def test_gff3_data_lines_have_nine_columns(self, helixer_gff3: tuple[str, subprocess.CompletedProcess[str]]
+                                               ) -> None:
         gff3, _ = helixer_gff3
         with open(gff3) as fh:
             for line_number, line in enumerate(fh, 1):
@@ -673,7 +674,6 @@ class TestHelixerPyCLI:
                 )
 
 
-# ---------------------------------------------------------------------------
 # 1-step vs 3-step GFF3 equivalence
 # ---------------------------------------------------------------------------
 

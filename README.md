@@ -9,7 +9,7 @@ is under ongoing development and improvements.
 ## Table of contents
 1. [Goal](#goal)
 2. [Web tool](#web-tool)
-3. [Installation](#install)
+3. [Installation](#installation)
 4. [Network architecture](#helixers-architecture)
 5. [Example usage](#example-usageinference-gene-calling)
 6. [Expert mode](#expert-mode)
@@ -83,6 +83,20 @@ of Helixer which you can use for inference.
 ![](img/network.png)
 ## Example usage/inference (gene calling)
 If you want to use Helixer to annotate a genome with a provided model, start here.
+
+> **Reproducibility note:** On most GPU architectures, repeated Helixer runs on the same machine
+> produce identical predictions without any special configuration. This has been confirmed for the
+> NVIDIA RTX PRO 6000, NVIDIA H100, and NVIDIA GeForce RTX 4080 SUPER. On some GPUs (e.g. NVIDIA
+> L40S) the default cuDNN algorithms are not deterministic, leading to small numerical differences
+> between runs. Passing `--deterministic` (Helixer.py or HybridModel.py) forces deterministic
+> cuDNN and cuBLAS kernels, which guarantees reproducibility on those GPUs at a potential
+> performance cost depending on the architecture: no slowdown was observed on the L40S, while the
+> RTX PRO 6000, which is already deterministic without the flag, ran 2.5x slower when it was
+> enabled.
+> 
+> **Note** that results can still differ across different GPU architectures (e.g. Volta vs.
+> Ampere vs. Ada Lovelace) regardless of this flag.
+  
 The best models are:
 
 | Lineage (choose the lineage your species belongs to for prediction) | Model filename              | Available since (year/month/date) |

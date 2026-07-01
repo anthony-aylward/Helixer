@@ -10,7 +10,7 @@ import pytest
 
 
 def _assert_importable(module: str, hint: str) -> None:
-    """Import module and fail with an actionable installation hint if it is missing."""
+    """Import module and fail with an installation hint if it is missing."""
     try:
         importlib.import_module(module)
     except ImportError:

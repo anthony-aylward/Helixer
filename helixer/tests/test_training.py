@@ -4,7 +4,7 @@ These tests cover the full training workflow using Arabidopsis lyrata chromosome
 downloaded from Ensembl Genomes FTP:
   1. Data download from FTP
   2. Geenuff import (train chromosome uses uncompressed FASTA + zip GFF3 to exercise
-     geenuff's multi-format support; val/test chromosomes stay as .gz)
+     Geenuff's multi-format support; val/test chromosomes stay as .gz)
   3. H5 export
   4. Training (HybridModel.py, 5 epochs)
   5. Tuning (resume training, 2 epochs)
@@ -32,7 +32,6 @@ import pytest
 from geenuff.applications.importer import ImportController
 from helixer.export.exporter import HelixerExportController
 
-# ---------------------------------------------------------------------------
 # Paths and constants
 # ---------------------------------------------------------------------------
 
@@ -65,7 +64,6 @@ REQUIRED_H5_KEYS = (
 )
 
 
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -75,7 +73,6 @@ def _gunzip(src: str, dest: str) -> None:
         shutil.copyfileobj(f_in, f_out)
 
 
-# ---------------------------------------------------------------------------
 # Session-scoped fixtures
 # ---------------------------------------------------------------------------
 
@@ -190,7 +187,8 @@ def training_result(wdir: pathlib.Path, train_h5_dir: str) -> tuple[str, subproc
 
 
 @pytest.fixture(scope='session')
-def tuning_result(wdir: pathlib.Path, train_h5_dir: str, training_result: tuple[str, subprocess.CompletedProcess[str]]) -> tuple[str, subprocess.CompletedProcess[str]]:
+def tuning_result(wdir: pathlib.Path, train_h5_dir: str, training_result: tuple[str, subprocess.CompletedProcess[str]]
+                  ) -> tuple[str, subprocess.CompletedProcess[str]]:
     """Resume training (tune) for 2 epochs; return (model_path, CompletedProcess)."""
     trained_model_path, _ = training_result
     tuned_model_path = f'{wdir}/tuned_model.h5'
@@ -213,7 +211,8 @@ def tuning_result(wdir: pathlib.Path, train_h5_dir: str, training_result: tuple[
 
 
 @pytest.fixture(scope='session')
-def eval_result(test_h5_path: str, tuning_result: tuple[str, subprocess.CompletedProcess[str]]) -> subprocess.CompletedProcess[str]:
+def eval_result(test_h5_path: str, tuning_result: tuple[str, subprocess.CompletedProcess[str]]
+                ) -> subprocess.CompletedProcess[str]:
     """Run eval (no overlap) with the tuned model; return CompletedProcess."""
     tuned_model_path, _ = tuning_result
     return subprocess.run(
@@ -227,7 +226,8 @@ def eval_result(test_h5_path: str, tuning_result: tuple[str, subprocess.Complete
 
 
 @pytest.fixture(scope='session')
-def eval_overlap_result(test_h5_path: str, tuning_result: tuple[str, subprocess.CompletedProcess[str]]) -> subprocess.CompletedProcess[str]:
+def eval_overlap_result(test_h5_path: str, tuning_result: tuple[str, subprocess.CompletedProcess[str]]
+                        ) -> subprocess.CompletedProcess[str]:
     """Run eval with overlap with the tuned model; return CompletedProcess."""
     tuned_model_path, _ = tuning_result
     return subprocess.run(
@@ -241,7 +241,6 @@ def eval_overlap_result(test_h5_path: str, tuning_result: tuple[str, subprocess.
     )
 
 
-# ---------------------------------------------------------------------------
 # Data download
 # ---------------------------------------------------------------------------
 
@@ -261,7 +260,6 @@ class TestDataDownload:
         assert os.path.getsize(downloaded_data['test']['gff']) > 0
 
 
-# ---------------------------------------------------------------------------
 # H5 export
 # ---------------------------------------------------------------------------
 
@@ -288,7 +286,6 @@ class TestH5Export:
             assert f['data/X'].shape[1] == 21384
 
 
-# ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
 
@@ -309,7 +306,6 @@ class TestTraining:
             assert len(f.keys()) > 0
 
 
-# ---------------------------------------------------------------------------
 # Tuning
 # ---------------------------------------------------------------------------
 
@@ -330,7 +326,6 @@ class TestTuning:
             assert len(f.keys()) > 0
 
 
-# ---------------------------------------------------------------------------
 # Eval
 # ---------------------------------------------------------------------------
 

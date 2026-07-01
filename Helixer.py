@@ -53,7 +53,11 @@ class HelixerParameterParser(ParameterParser):
         self.pred_group = self.parser.add_argument_group("Prediction parameters")
         self.pred_group.add_argument('--batch-size', type=int,
                                      help='The batch size for the raw predictions in TensorFlow. Should be as large as '
-                                          'possible on your GPU to save prediction time. (Default is 8.)')
+                                          'possible on your GPU to save prediction time. (Default is 32.)')
+        self.pred_group.add_argument('--deterministic', action='store_true',
+                                     help='enable deterministic GPU operations; reproducible across runs '
+                                          'on GPUs that are not deterministic by default; '
+                                          'may be slower on some GPU architectures')
         self.data_group.add_argument('--no-overlap', action='store_true',
                                      help='Switches off the overlapping after predictions are made. Predictions without'
                                           ' overlapping will be faster, but will have lower quality towards '
@@ -94,6 +98,7 @@ class HelixerParameterParser(ParameterParser):
             'model_filepath': None,
             'downloaded_model_path': None,
             'batch_size': 32,
+            'deterministic': False,
             'no_overlap': False,
             'overlap_offset': None,
             'overlap_core_length': None,
@@ -255,6 +260,8 @@ def main() -> None:
         ]
         if args.overlap:
             hybrid_model_args.append('--overlap')
+        if args.deterministic:
+            hybrid_model_args.append('--deterministic')
         model = HybridModel(cli_args=hybrid_model_args)
         model.run()
 

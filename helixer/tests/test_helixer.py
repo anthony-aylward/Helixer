@@ -32,7 +32,9 @@ FASTA_OUT_FILE = H5_OUT_FOLDER + 'fasta_test_data.h5'
 EVAL_H5 = 'testdata/tmp.h5'
 
 
-### preparation and breakdown ###
+# Session-scoped fixtures
+# --------------------------------------------------------------------------
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_dummy_db(request: pytest.FixtureRequest) -> None:
     if not os.getcwd().endswith('Helixer/helixer'):
@@ -98,8 +100,11 @@ def setup_dummy_evaluation_h5(request: pytest.FixtureRequest) -> None:
     os.remove(h5path)
 
 
-### helper functions ###
-def mk_controllers(source_db: str, helixer_db: str = TMP_DB, h5_out: str = H5_OUT_FILE) -> tuple[HelixerController, HelixerExportController]:
+# Helper functions
+# ---------------------------------------------------------------------------
+
+def mk_controllers(source_db: str, helixer_db: str = TMP_DB, h5_out: str = H5_OUT_FILE)\
+        -> tuple[HelixerController, HelixerExportController]:
     for p in [helixer_db, h5_out]:
         if os.path.exists(p):
             os.remove(p)
@@ -144,7 +149,9 @@ def setup_simpler_numerifier() -> tuple[Session, Coordinate]:
     return sess, coord
 
 
-### db import from GeenuFF ###
+# Database import from GeenuFF
+# ---------------------------------------------------------------------------
+
 def test_copy_n_import() -> None:
     _, controller = mk_controllers(source_db=DUMMYLOCI_DB)
     session = controller.exporter.session
@@ -166,7 +173,9 @@ def test_copy_n_import() -> None:
     assert len(all_features) == 9
 
 
-#### numerify ####
+# Numerification
+# ---------------------------------------------------------------------------
+
 def test_stepper() -> None:
     # evenly divided
     s = Stepper(50, 10)
@@ -278,7 +287,7 @@ def test_coherent_slicing() -> None:
 
 
 def test_minus_strand_numerify() -> None:
-    # setup a very basic -strand locus
+    # set up a very basic -strand locus
     _, coord = setup_simpler_numerifier()
     numerifier = AnnotationNumerifier(coord=coord,
                                       features=coord.features,
@@ -843,7 +852,8 @@ def test_gene_lengths() -> None:
     # first coord plus strand (test cases 1-3)
     assert np.array_equal(gl[0][:400], np.full((400,), 400, dtype=np.uint32))
     assert np.array_equal(gl[0][400:1199], np.full((1199 - 400,), 0, dtype=np.uint32))
-    assert np.array_equal(gl[0][1199:1400], np.full((1400 - 1199,), 0, dtype=np.uint32))  # no gene length for non-coding (by default)
+    # no gene length for non-coding (by default)
+    assert np.array_equal(gl[0][1199:1400], np.full((1400 - 1199,), 0, dtype=np.uint32))
 
     # second coord plus strand (test cases 5-6)
     assert np.array_equal(gl[2][:300], np.full((300,), 300, dtype=np.uint32))
@@ -883,7 +893,7 @@ def test_seqids_start_ends() -> None:
 
     for se in [start_ends_1, start_ends_2, start_ends_3]:
         start_ends_true += se  # plus strand
-        # minus strand, reverse both order of chunks as well as order inside chunks coords
+        # minus strand, reverses the order of chunks as well as the order inside chunk coords
         start_ends_true += [[end, start] for start, end in se[::-1]]
     assert np.array_equal(start_ends, np.array(start_ends_true, dtype=start_ends.dtype))
 
@@ -1075,7 +1085,9 @@ def test_transition_encoding_and_weights() -> None:
     assert np.array_equal(applied_tw_3_stretch_plus, expect_3_stretch)
 
 
-### RNAseq / coverage or scoring related (evaluation)
+# RNAseq / coverage or scoring related (evaluation)
+# ---------------------------------------------------------------------------
+
 def test_contiguous_bits() -> None:
     """confirm correct splitting at sequence breaks or after filtering when data is chunked for mem efficiency"""
 
@@ -1272,7 +1284,9 @@ def test_predictions_realdata() -> None:
                     assert np.all(np.argmax(inputpred, axis=1) == pre_hint['category'])
 
 
-# overlapping
+# Overlapping
+# ---------------------------------------------------------------------------
+
 def test_ol_length_in_matches_out_sub_batch() -> None:
     """test that predictions length matches input length, after sliding window preds and overlapping, in sub batch"""
     x_dset = np.zeros(shape=(16, 20000, 4))
@@ -1341,9 +1355,11 @@ def test_ol_indivisible_chunksize() -> None:
                     sb = overlap.SubBatch(h5_indices=indices, overlap_offset=oo, chunk_size=20000, 
                                           edge_handle_start=False, edge_handle_end=False, is_plus_strand=True)
                     # just checking identity, doesn't matter whether we actually have preds
-                    raw_preds = sb.mk_sliding_overlaps_for_data_sub_batch(data_sub_batch=x_dset[np.array(sb.h5_indices)])
+                    raw_preds = sb.mk_sliding_overlaps_for_data_sub_batch(
+                        data_sub_batch=x_dset[np.array(sb.h5_indices)])
                     expect = x_dset[np.array(indices)]
                     assert np.allclose(expect, sb._overlap_preds(raw_preds, core_length=core_length))
+
 
 def test_ol_pred_overlap_and_weighting() -> None:
     sb = overlap.SubBatch(h5_indices=(0, 1),
@@ -1463,16 +1479,10 @@ def test_direct_fasta_export() -> None:
     # generate lists we can then sort and compare
     fasta = [(i, s, se) for i, (s, se) in enumerate(zip(seqids_fasta, start_ends_fasta))]
     db = [(i, s, se) for i, (s, se) in enumerate(zip(seqids_db, start_ends_db))]
-    fn_sort = lambda t: (t[1], t[2][0], t[2][1])
-    fasta_sorted, db_sorted = sorted(fasta, key=fn_sort), sorted(db, key=fn_sort)
+    fasta_sorted, db_sorted = (sorted(fasta, key=lambda t: (t[1], t[2][0], t[2][1])),
+                               sorted(db, key=lambda t: (t[1], t[2][0], t[2][1])))
 
     for ((i, fasta_seqid, fasta_se), (j, db_seqid, db_se)) in zip(fasta_sorted, db_sorted):
         assert fasta_seqid == db_seqid
         assert fasta_se[0] == db_se[0] and fasta_se[1] == db_se[1]
         assert np.array_equal(X_fasta[i], X_db[j])
-
-
-
-
-
-

@@ -557,6 +557,11 @@ class HelixerModel(ABC):
         self.parser.add_argument('--gpu-id', type=int, default=-1,
                                  help='sets GPU index, use if you want to train on one GPU on a multi-GPU machine '
                                       'without a job scheduler system')
+        self.parser.add_argument('--deterministic',
+                                 action='store_true',
+                                 help='enable deterministic GPU ops; needed only in special cases where the GPU '
+                                      'is gives non-reproducible results; ensures reproducibility but '
+                                      'potentially slower')
         self.parser.add_argument('--workers', type=int, default=1,
                                  help='number of threads used to fetch input data for training; '
                                       'consider setting to match the number of GPUs')
@@ -653,10 +658,14 @@ class HelixerModel(ABC):
         return callbacks
 
     def set_resources(self) -> None:
+        if self.deterministic:
+            os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+            os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+            tf.config.experimental.enable_op_determinism()
+            logger.info(f'Using deterministic mode: {self.deterministic}')
         gpu_devices = tf.config.experimental.list_physical_devices('GPU')
         for device in gpu_devices:
             tf.config.experimental.set_memory_growth(device, True)
-
         K.set_floatx(self.float_precision)
         if self.gpu_id > -1:
             tf.config.set_visible_devices([gpu_devices[self.gpu_id]], 'GPU')
