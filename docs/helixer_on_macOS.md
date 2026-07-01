@@ -21,33 +21,7 @@ Edit `requirements.3.10.txt`:
 ````bash
 # change HTSeq version:
 HTSeq==2.0.8
-# comment out nni:
-# nni==2.10.1
 ````
-Edit `pyproject.toml`:
-```bash
-# remove this in line 21:
-    "nni",
-
-# the edited dependency list should look like this:
-dependencies = [
-    "geenuff @ git+https://github.com/weberlab-hhu/GeenuFF@v0.3.2",
-    "sqlalchemy==1.3.22",
-    "tensorflow>=2.6.2",
-    "tensorflow-addons>=0.21.0",
-    "seaborn",
-    "Keras<3.0.0",
-    "keras_layer_normalization",
-    "terminaltables",
-    "HTSeq",
-    "intervaltree",
-    "numpy",
-    "h5py",
-    "multiprocess",
-    "numcodecs",
-    "appdirs"
-]
-```
 
 ### 1.2 Install Helixer as usual
 ````bash
@@ -107,8 +81,3 @@ GPU was successfully registered.
 ## 4. Test training
 
 The [Helixer training example](training.md) also works fully on macOS with the custom installation.
-  
-For the features of NNI during training, installation from source is necessary. For details on how
-to install NNI on macOS, please check out the
-[official documentation](https://nni.readthedocs.io/en/stable/installation.html).
-Please note that NNI was discontinued and the GitHub archived.

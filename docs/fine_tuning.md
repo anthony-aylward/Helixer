@@ -117,7 +117,7 @@ to the training command with `HybridModel.py`:
 ```bash
 HybridModel.py --data-dir <path_to_your_training_data>/train/ \
 --save-model-path <where_to_save_the_model>/best_helixer_model.h5 \
-  --epochs 50 --predict-phase --load-model-path <trained_model.h5> --resume-training \
+  --epochs 50 --load-model-path <trained_model.h5> --resume-training \
   --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]"
 ```
 #### Parameter explanation
@@ -125,8 +125,7 @@ HybridModel.py --data-dir <path_to_your_training_data>/train/ \
 |:---------------------|:----------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | -d/--data-dir        | /               | Directory containing training and validation data (.h5 files). The naming convention for the training and validation files is "training_data[...].h5" and "validation_data[...].h5" respectively.                            |
 | -s/--save-model-path | ./best_model.h5 | Path to save the best model (model with the best validation genic F1 (the F1 for the classes CDS, UTR and Intron)) to.                                                                                                       |
-| -e/--epochs*         | 10,000          | Number of training runs                                                                                                                                                                                                      |
-| --predict-phase      | False           | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
+| -e/--epochs          | 10,000          | Number of training runs                                                                                                                                                                                                      |
 | -l/--load-model-path | /               | Path to a trained/pretrained model checkpoint. (HDF5 format)                                                                                                                                                                 |
 | --resume-training    | False           | Add this to resume training (pretrained model checkpoint necessary)                                                                                                                                                          |
 | --class-weights      | /               | Weighting of the 4 classes [intergenic, UTR, CDS, Intron] (Helixer predictions)                                                                                                                                              |
@@ -325,7 +324,7 @@ ls -sSh <fine_tuning_data_dir>/
 # appropriate batch sizes depend on the size of your GPU
 HybridModel.py --batch-size 50 --val-test-batch-size 100 -e 100 \
   --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]" \
-  --predict-phase --learning-rate 0.0001 --resume-training --fine-tune \
+  --learning-rate 0.0001 --resume-training --fine-tune \
   --load-model-path <$HOME/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5> \
   --data-dir <fine_tuning_data_dir> --save-model-path <tuned_for_your_species_best_model.h5> -v
 # default download path for Helixer models when using the autodownload
@@ -338,7 +337,6 @@ HybridModel.py --batch-size 50 --val-test-batch-size 100 -e 100 \
 | -e/--epochs           | 10,000          | Number of training runs                                                                                                                                                                                                      |
 | --class-weights       | /               | Weighting of the 4 classes [intergenic, UTR, CDS, Intron] (Helixer predictions)                                                                                                                                              |
 | --transition-weights  | /               | Weighting of the 6 transition categories [transcription start site, start codon, donor splice site, transcription stop site, stop codon, acceptor splice site]                                                               |
-| --predict-phase       | False           | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
 | --learning-rate       | 3e-4            | Learning rate for training                                                                                                                                                                                                   |
 | --resume-training     | False           | Add this to resume training (pretrained model checkpoint necessary)                                                                                                                                                          |
 | --fine-tune           | False           | Add/Use with --resume-training to replace and fine tune just the very last layer                                                                                                                                             |
@@ -441,7 +439,7 @@ python3 <path_to>/Helixer/helixer/evaluation/add_ngs_coverage.py \
 | --second-read-is-sense-strand | False   | Add to define that the second strand is the sense strand, e.g. reads ARE from a typical dUTP protocol                                                                                    |
 | -b/-bam                       | /       | Sorted (and indexed) bam file(s). Coverage to be added.                                                                                                                                  |
 | -d/--h5-data                  | /       | H5 data file with assembly (result of `fasta2h5.py`) and annotation information (result of `import2geenuff.py` and `geenuff2h5.py`) to which evaluation coverage will be added           |
-| --dataset-prefix              | cage    | Prefix for the datasets file to store the resulting coverage, i.e. 'rnaseq', 'cage', ... ; datasets will be: `/evaluation/{prefix}_coverage` and `/evaluation/{prefix}_spliced_coverage` |
+| --dataset-prefix              | rnaseq  | Prefix for the datasets file to store the resulting coverage, i.e. 'rnaseq', 'cage', ... ; datasets will be: `/evaluation/{prefix}_coverage` and `/evaluation/{prefix}_spliced_coverage` |
 | --threads                     | 8       | How many threads to use, set to a value <= 1 to not use multiprocessing. Hint: if you have multiple `.bam` files, you could set the number to the amount of bam files                    |
 
 ###### Parameters - additional information
@@ -470,7 +468,7 @@ but requires a few extra parameters.
 ```bash
 HybridModel.py -v --batch-size 140 --val-test-batch-size 280 \
    --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]" \
-   --predict-phase --learning-rate 0.0001 --resume-training --fine-tune \
+   --learning-rate 0.0001 --resume-training --fine-tune \
    --load-model-path <$HOME/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5> \
    --input-coverage --coverage-norm log --data-dir <fine_tuning_data_dir> --save-model-path <best_tuned_rnaseq_model.h5>
 ```
@@ -482,7 +480,6 @@ HybridModel.py -v --batch-size 140 --val-test-batch-size 280 \
 | -e/--epochs           | 10,000          | Number of training runs                                                                                                                                                                                                      |
 | --class-weights       | /               | Weighting of the 4 classes [intergenic, UTR, CDS, Intron] (Helixer predictions)                                                                                                                                              |
 | --transition-weights  | /               | Weighting of the 6 transition categories [transcription start site, start codon, donor splice site, transcription stop site, stop codon, acceptor splice site]                                                               |
-| --predict-phase       | False           | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
 | --learning-rate       | 3e-4            | Learning rate for training                                                                                                                                                                                                   |
 | --resume-training     | False           | Add this to resume training (pretrained model checkpoint necessary)                                                                                                                                                          |
 | --fine-tune           | False           | Add/Use with --resume-training to replace and fine tune just the very last layer                                                                                                                                             |
@@ -538,8 +535,7 @@ and make sure the h5 file contains the coverage (added with
   specified) in exactly the same order as at training time!**
 - You will have to specify parameters at inference time, as done at 
 train time. These are `--input-coverage`, `--coverage-norm <log>`,
-`--predict-phase`, and `--post-coverage-hidden-layer` (if used
-during training).
+and `--post-coverage-hidden-layer` (if used during training).
 - Finally, you will have to provide `HybridModel.py` the path not just to
 the fine-tuned model with `--load-model-path`; but also provide the 
 pretrained model on which the tuning was performed under 
@@ -551,7 +547,7 @@ HybridModel.py --load-model-path <fine_tuned_model>.h5 \
  --pretrained-model-path <pretrained_model>.h5 \
  --test-data <your_species_with_coverage>.h5 --overlap \
  --val-test-batch-size 32 -v --input-coverage --coverage-norm log \
- --predict-phase --prediction-output-path <your_species_fine_tuned_predictions.h5>
+ --prediction-output-path <your_species_fine_tuned_predictions.h5>
 # example pretrained model: land_plant_v0.3_a_0080.h5
 ```
 Afterward, use HelixerPost as shown in the [README](../README.md#3-step-inference)

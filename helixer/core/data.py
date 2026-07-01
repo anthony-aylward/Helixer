@@ -1,19 +1,20 @@
 import logging
 import os
 import sys
-
 import requests
 import appdirs
-
 import csv
+from termcolor import colored
 
 
 MODEL_PATH = os.path.join(appdirs.user_data_dir('Helixer'), 'models')
 MODEL_LIST_URL = 'https://raw.githubusercontent.com/weberlab-hhu/Helixer/main/resources/model_list.csv'
 MODEL_LIST = 'model_list.csv'
 
+logger = logging.getLogger('HelixerLogger')
 
-def set_model_path(custom_path):
+
+def set_model_path(custom_path: str | None) -> str:
     if custom_path is not None:
         assert os.path.exists(custom_path), \
             f"the custom directory {custom_path} for downloading Helixer's models does not exist"
@@ -21,7 +22,7 @@ def set_model_path(custom_path):
     return MODEL_PATH
 
 
-def fetch_and_organize_models(priority_models, model_path):
+def fetch_and_organize_models(priority_models: list[dict], model_path: str) -> None:
     """downloads current best models to Helixer's user data directory"""
 
     # main model directory
@@ -40,7 +41,7 @@ def fetch_and_organize_models(priority_models, model_path):
         r = requests.get(url, allow_redirects=True)
         with open(os.path.join(model_path, lineage, mfile), 'wb') as f:
             f.write(r.content)
-        print(f'saved model {mfile} to {model_path}')
+        logger.info(f'saved model {mfile} to {model_path}')
 
     # additionally save model list to disk (so it can run offline w/ default models)
     r = requests.get(MODEL_LIST_URL, allow_redirects=True)
@@ -48,7 +49,7 @@ def fetch_and_organize_models(priority_models, model_path):
         f.write(r.content)
 
 
-def prioritized_models(lineage, model_path):
+def prioritized_models(lineage: str | None, model_path: str) -> list[dict]:
     """get priority sorted list of available models for lineage"""
     model_list_url = MODEL_LIST_URL
 
@@ -58,11 +59,11 @@ def prioritized_models(lineage, model_path):
             ml = ml.decode().split('\n')
     except requests.exceptions.RequestException as e:
         existing_list = os.path.join(model_path, MODEL_LIST)
-        print(f'encountered error: \n{e};\n\ncontinuing with existing list: {existing_list}')
+        logger.error(colored(f'encountered error: \n{e};\n\ncontinuing with existing list: {existing_list}', 'red'))
         with open(existing_list) as f:
             ml = f.readlines()
             ml = [x.rstrip() for x in ml]
-    print(f'retrieved list of available models from {MODEL_LIST_URL}')
+    logger.info(f'retrieved list of available models from {MODEL_LIST_URL}')
 
     cr = csv.reader(ml)
     models = []
@@ -81,7 +82,7 @@ def prioritized_models(lineage, model_path):
     return sorted(models, key=lambda m: m['priority'])
 
 
-def identify_current(lineage, prioritized, model_path):
+def identify_current(lineage: str, prioritized: list[dict], model_path: str) -> str | None:
     """identify which pre-downloaded model has the highest priority / should be used"""
     prioritized_dict = {x['model_file_name']: x for x in prioritized}
     current_models = os.listdir(os.path.join(model_path, lineage))
@@ -103,7 +104,7 @@ def identify_current(lineage, prioritized, model_path):
         return None
 
 
-def report_if_current_not_best(prioritized, current):
+def report_if_current_not_best(prioritized: list[dict], current: str | None) -> None:
     if current is None:
         print('Error: Cannot continue without a model, either download models with `fetch_helixer_models.py`'
               'or set --model-filepath in Helixer.py', file=sys.stderr)
@@ -111,7 +112,7 @@ def report_if_current_not_best(prioritized, current):
     elif current == prioritized[0]['model_file_name']:
         pass  # all up to date, no action required
     else:
-        logging.info(f'newer/better model: {prioritized[0]["model_file_name"]} available than current: {current}'
-                     f'for lineage {prioritized[0]["lineage"]}.'
-                     f'You can get the latest model(s) with fetch_helixer_models.py, if desired.')
+        logger.info(f'newer/better model: {prioritized[0]["model_file_name"]} available than current: {current}'
+                    f'for lineage {prioritized[0]["lineage"]}.'
+                    f'You can get the latest model(s) with fetch_helixer_models.py, if desired.')
 

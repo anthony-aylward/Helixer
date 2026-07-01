@@ -5,6 +5,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import pytest
 import h5py
+from sqlalchemy.orm import Session
 
 import geenuff
 from geenuff.tests.test_geenuff import mk_memory_session
@@ -31,9 +32,11 @@ FASTA_OUT_FILE = H5_OUT_FOLDER + 'fasta_test_data.h5'
 EVAL_H5 = 'testdata/tmp.h5'
 
 
-### preparation and breakdown ###
+# Session-scoped fixtures
+# --------------------------------------------------------------------------
+
 @pytest.fixture(scope="session", autouse=True)
-def setup_dummy_db(request):
+def setup_dummy_db(request: pytest.FixtureRequest) -> None:
     if not os.getcwd().endswith('Helixer/helixer'):
         pytest.exit('Tests need to be run from Helixer/helixer directory')
 
@@ -69,7 +72,7 @@ def setup_dummy_db(request):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_dummy_evaluation_h5(request):
+def setup_dummy_evaluation_h5(request: pytest.FixtureRequest) -> None:
     start_ends = [[0, 20000],  # increasing 0
                   [20000, 40000],  # increasing 0
                   [60000, 80000],  # increasing 1
@@ -97,8 +100,11 @@ def setup_dummy_evaluation_h5(request):
     os.remove(h5path)
 
 
-### helper functions ###
-def mk_controllers(source_db, helixer_db=TMP_DB, h5_out=H5_OUT_FILE):
+# Helper functions
+# ---------------------------------------------------------------------------
+
+def mk_controllers(source_db: str, helixer_db: str = TMP_DB, h5_out: str = H5_OUT_FILE)\
+        -> tuple[HelixerController, HelixerExportController]:
     for p in [helixer_db, h5_out]:
         if os.path.exists(p):
             os.remove(p)
@@ -108,21 +114,21 @@ def mk_controllers(source_db, helixer_db=TMP_DB, h5_out=H5_OUT_FILE):
     return mer_controller, export_controller
 
 
-def memory_import_fasta(fasta_path):
+def memory_import_fasta(fasta_path: str) -> tuple[ImportController, list[Coordinate]]:
     controller = ImportController(database_path='sqlite:///:memory:', config={})
     controller.add_sequences(fasta_path)
     coords = controller.session.query(Coordinate).order_by(Coordinate.id).all()
     return controller, coords
 
 
-def setup_dummyloci():
+def setup_dummyloci() -> tuple[Session, HelixerExportController, Coordinate | None]:
     _, export_controller = mk_controllers(DUMMYLOCI_DB)
     session = export_controller.exporter.session
     coordinate = session.query(Coordinate).first()
     return session, export_controller, coordinate
 
 
-def setup_simpler_numerifier():
+def setup_simpler_numerifier() -> tuple[Session, Coordinate]:
     sess = mk_memory_session()
     genome = Genome()
     coord = Coordinate(genome=genome, sequence='A' * 100, length=100, seqid='a')
@@ -143,8 +149,10 @@ def setup_simpler_numerifier():
     return sess, coord
 
 
-### db import from GeenuFF ###
-def test_copy_n_import():
+# Database import from GeenuFF
+# ---------------------------------------------------------------------------
+
+def test_copy_n_import() -> None:
     _, controller = mk_controllers(source_db=DUMMYLOCI_DB)
     session = controller.exporter.session
     sl = session.query(SuperLocus).filter(SuperLocus.given_name == 'gene0').one()
@@ -165,8 +173,10 @@ def test_copy_n_import():
     assert len(all_features) == 9
 
 
-#### numerify ####
-def test_stepper():
+# Numerification
+# ---------------------------------------------------------------------------
+
+def test_stepper() -> None:
     # evenly divided
     s = Stepper(50, 10)
     strt_ends = list(s.step_to_end())
@@ -190,7 +200,7 @@ def test_stepper():
     assert strt_ends[-1] == (0, 9)
 
 
-def test_short_sequence_numerify():
+def test_short_sequence_numerify() -> None:
     _, coords = memory_import_fasta('testdata/basic_sequences.fa')
     numerifier = SequenceNumerifier(coord=coords[3], max_len=100)
     matrix = numerifier.coord_to_matrices()['plus'][0]
@@ -209,7 +219,7 @@ def test_short_sequence_numerify():
     assert np.array_equal(expect, matrix)
 
 
-def test_base_level_annotation_numerify():
+def test_base_level_annotation_numerify() -> None:
     _, _, coord = setup_dummyloci()
     numerifier = AnnotationNumerifier(coord=coord,
                                       features=coord.features,
@@ -224,7 +234,7 @@ def test_base_level_annotation_numerify():
     assert np.array_equal(nums, expect)
 
 
-def test_sequence_slicing():
+def test_sequence_slicing() -> None:
     _, coords = memory_import_fasta('testdata/basic_sequences.fa')
     seq_numerifier = SequenceNumerifier(coord=coords[0], max_len=50)
     num_mats = seq_numerifier.coord_to_matrices()
@@ -238,7 +248,7 @@ def test_sequence_slicing():
     assert np.array_equal(num_list[8], np.full([5, 4], 0.25, dtype=np.float32))
 
 
-def test_coherent_slicing():
+def test_coherent_slicing() -> None:
     """Tests for coherent output when slicing the 405 bp long dummyloci.
     The correct divisions are already tested in the Stepper test.
     The array format of the individual matrices are tested in
@@ -276,8 +286,8 @@ def test_coherent_slicing():
     assert np.array_equal(expect[:1150], np.concatenate(anno_error_masks)[:1150])
 
 
-def test_minus_strand_numerify():
-    # setup a very basic -strand locus
+def test_minus_strand_numerify() -> None:
+    # set up a very basic -strand locus
     _, coord = setup_simpler_numerifier()
     numerifier = AnnotationNumerifier(coord=coord,
                                       features=coord.features,
@@ -308,10 +318,10 @@ def test_minus_strand_numerify():
     assert np.array_equal(nums['minus'][1], np.flip(expect[0:50], axis=0))
 
 
-def test_coord_numerifier_and_h5_gen_plus_strand():
+def test_coord_numerifier_and_h5_gen_plus_strand() -> None:
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     x = f['/data/X'][:]
@@ -354,11 +364,11 @@ def test_coord_numerifier_and_h5_gen_plus_strand():
     assert np.array_equal(sample_weights[1][:5], sample_weight_expect[400:])
 
 
-def test_coord_numerifier_and_h5_gen_minus_strand():
+def test_coord_numerifier_and_h5_gen_minus_strand() -> None:
     """Tests numerification of test case 8 on coordinate 2"""
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=200, one_hot=False, longest_only=False)
+    controller.export(chunk_size=200, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     x = f['/data/X'][:]
@@ -413,8 +423,8 @@ def test_coord_numerifier_and_h5_gen_minus_strand():
     assert np.array_equal(sample_weights[1][:50], sample_weight_expect[200:250])
 
 
-def test_numerify_with_end_neg1():
-    def check_one(coord, is_plus_strand, expect, maskexpect):
+def test_numerify_with_end_neg1() -> None:
+    def check_one(coord: Coordinate, is_plus_strand: bool, expect: np.ndarray, maskexpect: np.ndarray) -> None:
         numerifier = AnnotationNumerifier(coord=coord,
                                           features=coord.features,
                                           max_len=1000,
@@ -437,10 +447,10 @@ def test_numerify_with_end_neg1():
                     print("masks[i] != maskexpect[i]: {} != {}, @ {}".format(masks[i], maskexpect[i], i))
             assert False, "mask arrays not equal, see above"
 
-    def expect0():
+    def expect0() -> np.ndarray:
         return np.zeros([1000, 3], dtype=np.float32)
 
-    def masks1():
+    def masks1() -> np.ndarray:
         return np.ones((1000,), dtype=int)
 
     controller = ImportController(database_path='sqlite:///:memory:', config={})
@@ -602,7 +612,7 @@ def test_numerify_with_end_neg1():
     check_one(coord, True, expect, maskexpect)
 
 
-def test_one_hot_encodings():
+def test_one_hot_encodings() -> None:
     classes_multi = [
         [0, 0, 0],
         [1, 0, 0],
@@ -643,7 +653,7 @@ def test_one_hot_encodings():
     assert np.all(np.count_nonzero(y_one_hot_4, axis=1) == 1)
 
 
-def test_confusion_matrix():
+def test_confusion_matrix() -> None:
     # 10 bases Intergenic
     # 8 bases UTR
     # 11 bases exon
@@ -818,11 +828,11 @@ def test_confusion_matrix():
     assert np.allclose(acc_true, cm._total_accuracy())
 
 
-def test_gene_lengths():
+def test_gene_lengths() -> None:
     """Tests the '/data/gene_lengths' array"""
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=5000, one_hot=True, longest_only=False)
+    controller.export(chunk_size=5000, write_by=21_384_000_000, one_hot=True, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     gl = f['/data/gene_lengths']
@@ -842,7 +852,8 @@ def test_gene_lengths():
     # first coord plus strand (test cases 1-3)
     assert np.array_equal(gl[0][:400], np.full((400,), 400, dtype=np.uint32))
     assert np.array_equal(gl[0][400:1199], np.full((1199 - 400,), 0, dtype=np.uint32))
-    assert np.array_equal(gl[0][1199:1400], np.full((1400 - 1199,), 0, dtype=np.uint32))  # no gene length for non-coding (by default)
+    # no gene length for non-coding (by default)
+    assert np.array_equal(gl[0][1199:1400], np.full((1400 - 1199,), 0, dtype=np.uint32))
 
     # second coord plus strand (test cases 5-6)
     assert np.array_equal(gl[2][:300], np.full((300,), 300, dtype=np.uint32))
@@ -861,9 +872,9 @@ def test_gene_lengths():
     f.close()
 
 
-def test_seqids_start_ends():
+def test_seqids_start_ends() -> None:
     _, controller, _ = setup_dummyloci()
-    controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     seqids = f['/data/seqids'][:]
@@ -882,20 +893,20 @@ def test_seqids_start_ends():
 
     for se in [start_ends_1, start_ends_2, start_ends_3]:
         start_ends_true += se  # plus strand
-        # minus strand, reverse both order of chunks as well as order inside chunks coords
+        # minus strand, reverses the order of chunks as well as the order inside chunk coords
         start_ends_true += [[end, start] for start, end in se[::-1]]
     assert np.array_equal(start_ends, np.array(start_ends_true, dtype=start_ends.dtype))
 
 
-def test_phases():
+def test_phases() -> None:
     """Tests the output of phase, which should be encoded for every cds base"""
-    def next_phase(p):
+    def next_phase(p: int) -> int:
         p -= 1
         if p < 0:
             p = 2
         return p
 
-    def check_phase_in_cds(phases, introns, is_plus, phase=0):
+    def check_phase_in_cds(phases: np.ndarray, introns: np.ndarray, is_plus: bool, phase: int = 0) -> None:
         assert np.all(phases[introns][:, 0] == 1)  # if there is no phase in introns
         # take from 1 here, and remove introns, so that the phase can be literally interpreted
         # i.e. index 0 is phase 0, 1 is 1, 2 is 2
@@ -910,7 +921,7 @@ def test_phases():
 
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    controller.export(chunk_size=5000, one_hot=True, longest_only=True)
+    controller.export(chunk_size=5000, write_by=21_384_000_000, one_hot=True, longest_only=True)
 
     f = h5py.File(H5_OUT_FILE, 'r')
     ph = f['/data/phases'][:]
@@ -950,7 +961,7 @@ def test_phases():
 
 
 # Setup dummy sequence with different feature transitions
-def setup_feature_transitions():
+def setup_feature_transitions() -> tuple[Session, Coordinate]:
     sess = mk_memory_session()
     genome = Genome()
     coord = Coordinate(genome=genome, sequence='A' * 720, length=720, seqid='a')
@@ -1003,7 +1014,7 @@ def setup_feature_transitions():
     return sess, coord
 
 
-def test_transition_encoding_and_weights():
+def test_transition_encoding_and_weights() -> None:
     """Tests encoding of feature transitions, usage of transition weights and stretched weights"""
     _, coord = setup_feature_transitions()
     numerifier = AnnotationNumerifier(coord=coord,
@@ -1074,8 +1085,10 @@ def test_transition_encoding_and_weights():
     assert np.array_equal(applied_tw_3_stretch_plus, expect_3_stretch)
 
 
-### RNAseq / coverage or scoring related (evaluation)
-def test_contiguous_bits():
+# RNAseq / coverage or scoring related (evaluation)
+# ---------------------------------------------------------------------------
+
+def test_contiguous_bits() -> None:
     """confirm correct splitting at sequence breaks or after filtering when data is chunked for mem efficiency"""
 
     h5 = h5py.File(EVAL_H5, 'r')
@@ -1097,7 +1110,7 @@ def test_contiguous_bits():
     h5.close()
 
 
-def test_coverage_in_bits():
+def test_coverage_in_bits() -> None:
     # coverage arrays have the total sequence length [0, 133333) and data for every point
     # just needs to be divvied up to match the bits of sequence that exist in the h5 start_ends
     length = 133333
@@ -1150,7 +1163,7 @@ def test_coverage_in_bits():
     h5.close()
 
 
-def test_super_chunking4write():
+def test_super_chunking4write() -> None:
     """Tests that the exact same h5 is produced, regardless of how many super-chunks it is written in"""
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
@@ -1201,7 +1214,7 @@ def test_super_chunking4write():
     assert n_writing_chunks == 10
 
 
-def test_rangefinder():
+def test_rangefinder() -> None:
     _, controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
     n_writing_chunks = controller.export(chunk_size=500, one_hot=True,
@@ -1212,7 +1225,7 @@ def test_rangefinder():
     assert sp_seqid_ranges == {b'dummy': {'start': 0, 'seqids': seqid_ranges, 'end': 18}}
 
 
-def test_confident_onecategory():
+def test_confident_onecategory() -> None:
     pred_chunk = np.full(fill_value=0., shape=(100, 4), dtype=np.float32)
     # identify a sharp transition 0 -> 1
     pred_chunk[:50, 0] = 1.
@@ -1247,7 +1260,7 @@ def test_confident_onecategory():
     assert chunks == []
 
 
-def test_predictions_realdata():
+def test_predictions_realdata() -> None:
     """test that _all_ predictions end up being the class from hints across real data as done in predictions2hints"""
     # what this decidedly does not test is going all the way to and from gff coordinates!
     data = h5py.File('testdata/mini_test_data.h5', 'r')
@@ -1271,8 +1284,10 @@ def test_predictions_realdata():
                     assert np.all(np.argmax(inputpred, axis=1) == pre_hint['category'])
 
 
-# overlapping
-def test_ol_length_in_matches_out_sub_batch():
+# Overlapping
+# ---------------------------------------------------------------------------
+
+def test_ol_length_in_matches_out_sub_batch() -> None:
     """test that predictions length matches input length, after sliding window preds and overlapping, in sub batch"""
     x_dset = np.zeros(shape=(16, 20000, 4))
     indices_to_test = [(0,),
@@ -1294,7 +1309,7 @@ def test_ol_length_in_matches_out_sub_batch():
                 assert overlapped.shape[1:] == (20000, 4)
 
 
-def test_ol_identical_preds_return_ori():
+def test_ol_identical_preds_return_ori() -> None:
     x_dsets = [np.random.rand(16, 20000, 4) for _ in range(10)]
     indices_to_test = [(0,), (1,), (4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
                        (1, 2), (3, 4, 5), (6, 7, 8, 9, 10, 11), tuple(range(8))]
@@ -1328,7 +1343,7 @@ def test_ol_identical_preds_return_ori():
     assert np.allclose(fin_preds, x_dset)
 
 
-def test_ol_indivisible_chunksize():
+def test_ol_indivisible_chunksize() -> None:
     """confirms input -> output holds for overlap offsets that don't divide chunksize"""
     x_dsets = [np.random.rand(16, 20000, 4) for _ in range(10)]
     indices_to_test = [(0,), (1,), (4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
@@ -1340,11 +1355,13 @@ def test_ol_indivisible_chunksize():
                     sb = overlap.SubBatch(h5_indices=indices, overlap_offset=oo, chunk_size=20000, 
                                           edge_handle_start=False, edge_handle_end=False, is_plus_strand=True)
                     # just checking identity, doesn't matter whether we actually have preds
-                    raw_preds = sb.mk_sliding_overlaps_for_data_sub_batch(data_sub_batch=x_dset[np.array(sb.h5_indices)])
+                    raw_preds = sb.mk_sliding_overlaps_for_data_sub_batch(
+                        data_sub_batch=x_dset[np.array(sb.h5_indices)])
                     expect = x_dset[np.array(indices)]
                     assert np.allclose(expect, sb._overlap_preds(raw_preds, core_length=core_length))
 
-def test_ol_pred_overlap_and_weighting():
+
+def test_ol_pred_overlap_and_weighting() -> None:
     sb = overlap.SubBatch(h5_indices=(0, 1),
                           overlap_offset=5000, chunk_size=20000,
                           edge_handle_start=False, edge_handle_end=False, is_plus_strand=True)
@@ -1393,14 +1410,14 @@ def test_ol_pred_overlap_and_weighting():
     assert np.allclose(expect, overlapped)
 
 
-def test_ol_overlap_seq_helper():
+def test_ol_overlap_seq_helper() -> None:
     """semi-integrated testing that no bit of sequence is added / lost """
 
-    def mk_cb(start_i, end_i):
+    def mk_cb(start_i: int, end_i: int) -> dict[str, bool | int]:
         # only that which is used
         return {"is_plus_strand": True, "start_i": start_i, "end_i": end_i}
 
-    def cmp_one(dummy_xpred, contiguous_ranges):
+    def cmp_one(dummy_xpred: np.ndarray, contiguous_ranges: list[dict[str, bool | int]]) -> None:
         ol_helper = overlap.OverlapSeqHelper(contiguous_ranges=contiguous_ranges,
                                              chunk_size=20000, max_batch_size=32, 
                                              overlap_offset=5000, core_length=10000)
@@ -1441,14 +1458,14 @@ def test_ol_overlap_seq_helper():
     cmp_one(dummy_xpred, contiguous_ranges)
 
 
-def test_direct_fasta_export():
+def test_direct_fasta_export() -> None:
     fasta_controller = HelixerFastaToH5Controller('testdata/dummyloci.fa', FASTA_OUT_FILE)
     fasta_controller.export_fasta_to_h5(chunk_size=400, compression='gzip', multiprocess=True,
                                         species='dummy', write_by=800)
 
     _, geenuff_controller, _ = setup_dummyloci()
     # dump the whole db in chunks into a .h5 file
-    geenuff_controller.export(chunk_size=400, one_hot=False, longest_only=False)
+    geenuff_controller.export(chunk_size=400, write_by=21_384_000_000, one_hot=False, longest_only=False)
 
     h5_fasta = h5py.File(FASTA_OUT_FILE, 'r')
     h5_db = h5py.File(H5_OUT_FILE, 'r')
@@ -1462,16 +1479,10 @@ def test_direct_fasta_export():
     # generate lists we can then sort and compare
     fasta = [(i, s, se) for i, (s, se) in enumerate(zip(seqids_fasta, start_ends_fasta))]
     db = [(i, s, se) for i, (s, se) in enumerate(zip(seqids_db, start_ends_db))]
-    fn_sort = lambda t: (t[1], t[2][0], t[2][1])
-    fasta_sorted, db_sorted = sorted(fasta, key=fn_sort), sorted(db, key=fn_sort)
+    fasta_sorted, db_sorted = (sorted(fasta, key=lambda t: (t[1], t[2][0], t[2][1])),
+                               sorted(db, key=lambda t: (t[1], t[2][0], t[2][1])))
 
     for ((i, fasta_seqid, fasta_se), (j, db_seqid, db_se)) in zip(fasta_sorted, db_sorted):
         assert fasta_seqid == db_seqid
         assert fasta_se[0] == db_se[0] and fasta_se[1] == db_se[1]
         assert np.array_equal(X_fasta[i], X_db[j])
-
-
-
-
-
-

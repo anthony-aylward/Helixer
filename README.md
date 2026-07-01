@@ -6,10 +6,20 @@ gene models in a gff3 file. It’s performant and applicable to a wide
 variety of genomes. However, users should be aware that this software
 is under ongoing development and improvements.
 
+## Changelog Version 0.3.7 (short)
+_please check out the releases for the full changelog_
+- fixed wrong HelixerPost default for min_coding_length in Helixer.py, affects
+all predictions generated through 1-step inference via Helixer.py
+- --predict-phase is now the default for every model, every script specifying
+--predict-phase for HybridModel.py needs to remove this argument as it no longer exists
+- added reproducibility notes (see [Example usage](#example-usageinference-gene-calling))
+and ensured determinism during inference using same hard- and software for GPUs using
+non-deterministic cuDNN algorithms
+
 ## Table of contents
 1. [Goal](#goal)
 2. [Web tool](#web-tool)
-3. [Installation](#install)
+3. [Installation](#installation)
 4. [Network architecture](#helixers-architecture)
 5. [Example usage](#example-usageinference-gene-calling)
 6. [Expert mode](#expert-mode)
@@ -37,13 +47,17 @@ You can then skip the installation instructions down below.
 The installation time depends on the installation method you are using (e.g.
 [docker/singularity](#via-docker--singularity-recommended) or
 [manual installation](#manual-installation)(only for Linux)) and your experience in using GitHub, Python and
-CUDA. The time it takes a decently experienced user to install Helixer is 20-30 minutes.
+CUDA. The time it takes a decently experienced user to install Helixer is 20-30 minutes; for inexperienced
+users it usually takes a maximum of 2-3 hours.
+
+There is the possibility to install Helixer on macOS which requires a few adjustments. Instructions can be
+found [here](docs/helixer_on_macOS.md).
 
 There is the possibility to install Helixer on macOS which requires a few adjustments. Instructions can be
 found [here](docs/helixer_on_macOS.md).
 
 ### GPU requirements
-For realistically sized datasets, an Nvidia GPU or an Apple Silicon GPU (M1/M2/M3) using
+For realistically sized datasets, an Nvidia GPU or an Apple Silicon GPU (>= M1) using
 Apple Metal Performance Shaders (MPS) GPU acceleration (beta support) will be necessary
 for acceptable performance.
 
@@ -79,6 +93,20 @@ of Helixer which you can use for inference.
 ![](img/network.png)
 ## Example usage/inference (gene calling)
 If you want to use Helixer to annotate a genome with a provided model, start here.
+
+> **Reproducibility note:** On most GPU architectures, repeated Helixer runs on the same machine
+> produce identical predictions without any special configuration. This has been confirmed for the
+> NVIDIA RTX PRO 6000, NVIDIA H100, and NVIDIA GeForce RTX 4080 SUPER. On some GPUs (e.g. NVIDIA
+> L40S) the default cuDNN algorithms are not deterministic, leading to small numerical differences
+> between runs. Passing `--deterministic` (Helixer.py or HybridModel.py) forces deterministic
+> cuDNN and cuBLAS kernels, which guarantees reproducibility on those GPUs at a potential
+> performance cost depending on the architecture: no slowdown was observed on the L40S, while the
+> RTX PRO 6000, which is already deterministic without the flag, ran 2.5x slower when it was
+> enabled.
+> 
+> **Note** that results can still differ across different GPU architectures (e.g. Volta vs.
+> Ampere vs. Ada Lovelace) regardless of this flag.
+  
 The best models are:
 
 | Lineage (choose the lineage your species belongs to for prediction) | Model filename              | Available since (year/month/date) |
@@ -145,7 +173,7 @@ The three main steps the command above executes can also be run separately:
 - [fasta2h5.py](fasta2h5.py): conversion of the DNA sequence to numerical matrices
 - [HybridModel.py](helixer/prediction/HelixerModel.py): prediction of base-wise
 probabilities with the Deep Learning based model defined/programmed in this file
-- [helixer_post_bin](https://github.com/TonyBolger/HelixerPost) (part of another
+- [helixer_post_bin](https://github.com/usadellab/HelixerPost) (part of another
 repository): post-processing into primary gene models
 
 Explanations for the parameters used in this example can be found
@@ -169,7 +197,7 @@ fasta2h5.py --species Arabidopsis_lyrata --h5-output-path Arabidopsis_lyrata.h5 
 # improve prediction quality at subsequence ends by creating and overlapping 
 # sliding-window predictions.)
 HybridModel.py --load-model-path $HOME/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5 \
-     --test-data Arabidopsis_lyrata.h5 --overlap --val-test-batch-size 32 -v --predict-phase
+     --test-data Arabidopsis_lyrata.h5 --overlap --val-test-batch-size 32 -v
 
 # order of input parameters:
 # helixer_post_bin <genome.h5> <predictions.h5> <window_size> <edge_threshold> <peak_threshold> <min_coding_length> <output.gff3>
@@ -199,7 +227,6 @@ the transcriptome, using a standard parser, for instance [gffread](https://githu
 | --overlap             | False   | Add to improve prediction quality at subsequence ends by creating and overlapping sliding-window predictions (with proportional increase in time usage).                                                                     |
 | --val-test-batch-size | 32      | Batch size for validation/test data                                                                                                                                                                                          |
 | -v/--verbose          | False   | Add to run HybridModel.py in verbosity mode (additional information will be printed)                                                                                                                                         |
-| --predict-phase       | False   | Add this to also predict phases for CDS (recommended);  format: [None, 0, 1, 2]; 'None' is used for non-CDS regions, within CDS regions 0, 1, 2 correspond to phase (number of base pairs until the start of the next codon) |
 ###### helixer_post_bin
 (positional arguments, not specified via name but order)   
    

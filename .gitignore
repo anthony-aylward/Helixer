@@ -140,3 +140,6 @@ venv.bak/
 
 # pycharm
 .idea/
+
+# claude
+CLAUDE.md
