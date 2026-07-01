@@ -117,7 +117,8 @@ to the training command with `HybridModel.py`:
 ```bash
 HybridModel.py --data-dir <path_to_your_training_data>/train/ \
 --save-model-path <where_to_save_the_model>/best_helixer_model.h5 \
-  --epochs 50 --load-model-path <trained_model.h5> --resume-training
+  --epochs 50 --load-model-path <trained_model.h5> --resume-training \
+  --class-weights "[0.7, 1.6, 1.2, 1.2]" --transition-weights "[1, 12, 3, 1, 12, 3]"
 ```
 #### Parameter explanation
 | Parameter            | Default         | Explanation                                                                                                                                                                                                                  |
@@ -127,6 +128,8 @@ HybridModel.py --data-dir <path_to_your_training_data>/train/ \
 | -e/--epochs          | 10,000          | Number of training runs                                                                                                                                                                                                      |
 | -l/--load-model-path | /               | Path to a trained/pretrained model checkpoint. (HDF5 format)                                                                                                                                                                 |
 | --resume-training    | False           | Add this to resume training (pretrained model checkpoint necessary)                                                                                                                                                          |
+| --class-weights      | /               | Weighting of the 4 classes [intergenic, UTR, CDS, Intron] (Helixer predictions)                                                                                                                                              |
+| --transition-weights | /               | Weighting of the 6 transition categories [transcription start site, start codon, donor splice site, transcription stop site, stop codon, acceptor splice site]                                                               |
 
 ***Hint**: The amount of epochs can be higher or lower dependent
 on the data and model. If your fine-tuned model is still improving after 50 epochs,
