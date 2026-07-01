@@ -6,6 +6,16 @@ gene models in a gff3 file. It’s performant and applicable to a wide
 variety of genomes. However, users should be aware that this software
 is under ongoing development and improvements.
 
+## Changelog Version 0.3.7 (short)
+_please check out the releases for the full changelog_
+- fixed wrong HelixerPost default for min_coding_length in Helixer.py, affects
+all predictions generated through 1-step inference via Helixer.py
+- --predict-phase is now the default for every model, every script specifying
+--predict-phase for HybridModel.py needs to remove this argument as it no longer exists
+- added reproducibility notes (see [Example usage](#example-usageinference-gene-calling))
+and ensured determinism during inference using same hard- and software for GPUs using
+non-deterministic cuDNN algorithms
+
 ## Table of contents
 1. [Goal](#goal)
 2. [Web tool](#web-tool)
