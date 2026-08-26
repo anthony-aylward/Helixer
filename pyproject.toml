@@ -18,10 +18,6 @@ dependencies = [
     "sqlalchemy==1.3.22",
     "tensorflow>=2.6.2",
     "tensorflow-addons>=0.21.0",
-<<<<<<< HEAD
-    "nni",
-=======
->>>>>>> d17bb496b8842542590644b2437798711c0125d5
     "seaborn",
     "Keras<3.0.0",
     "keras_layer_normalization",
@@ -34,8 +30,6 @@ dependencies = [
     "numcodecs",
     "appdirs"
 ]
-<<<<<<< HEAD
-=======
 authors = [
   {name = "Alisandra K. Denton"},
   {name = "Felix Holst"},
@@ -44,18 +38,14 @@ authors = [
   {name = "Felicitas Kindel"},
   {name = "Christopher Guenther"},
 ]
->>>>>>> d17bb496b8842542590644b2437798711c0125d5
 
 [project.urls]
 "Homepage" = "https://github.com/weberlab-hhu/Helixer"
 "Documentation" = "https://github.com/weberlab-hhu/Helixer"
 
-<<<<<<< HEAD
-=======
 [project.license]
 text = "GNU General Public License v3 (GPLv3)"
 
->>>>>>> d17bb496b8842542590644b2437798711c0125d5
 [tool.setuptools]
 packages = [
     "helixer",
@@ -66,9 +56,5 @@ packages = [
     "helixer.export"
 ]
 package-data = {helixer = ["testdata/*.fa", "testdata/*.gff"]}
-<<<<<<< HEAD
-script-files = ["Helixer.py", "fasta2h5.py", "geenuff2h5.py", "helixer/prediction/HybridModel.py", "scripts/fetch_helixer_models.py"]
-=======
 script-files = ["Helixer.py", "fasta2h5.py", "geenuff2h5.py", "helixer/prediction/HybridModel.py",
     "scripts/fetch_helixer_models.py"]
->>>>>>> d17bb496b8842542590644b2437798711c0125d5
