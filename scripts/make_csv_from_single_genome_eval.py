@@ -2,8 +2,7 @@
 
 """Extract the results from a single genome eval. Parses the file given by --log-file-name
 for the F1 summary table, extracts the main information and outputs a .csv that can then
-be imported elsewhere. Expects every eval to be in a seperate subfolder (like with
-the 'trials' folder of nni)."""
+be imported elsewhere. Expects every eval to be in a separate subfolder."""
 
 import os
 import h5py
@@ -19,7 +18,7 @@ def parse_total_acc(log_file):
 
 def parse_f1_line(log_file):
     line_parts = next(log_file).strip().split('|')
-    f1_idx = 5 if 'PRINT' in line_parts[0] else 4  # check if we have an nni log file
+    f1_idx = 4
     return line_parts[f1_idx].strip()
 
 parser = argparse.ArgumentParser()
