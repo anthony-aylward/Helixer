@@ -1,6 +1,6 @@
 name: helixer
 dependencies: 
-    - python=3.8.5
+    - python
     - pip
     - pip :
-        - -r requirements.txt 
+        - -r requirements.3.10.txt 
