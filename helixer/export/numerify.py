@@ -1,15 +1,16 @@
 """convert cleaned-db schema to numeric values describing gene structure"""
 import time
-
+import logging
 import geenuff.base.types
 import numpy as np
 import math
-import logging
 import multiprocess
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 
 from geenuff.base import types
 
+logger = logging.getLogger('HelixerLogger')
 
 AMBIGUITY_DECODE = {
     'C': [1., 0., 0., 0.],
@@ -31,12 +32,12 @@ AMBIGUITY_DECODE = {
 
 
 class Stepper(object):
-    def __init__(self, end, by):
+    def __init__(self, end: int, by: int) -> None:
         self.at = 0
         self.end = end
         self.by = by
 
-    def step(self):
+    def step(self) -> tuple[int, int]:
         prev = self.at
         if prev + self.by < self.end:
             new = prev + self.by
@@ -45,13 +46,14 @@ class Stepper(object):
         self.at = new
         return prev, new
 
-    def step_to_end(self):
+    def step_to_end(self) -> Iterator[tuple[int, int]]:
         while self.at < self.end:
             yield self.step()
 
 
 class Numerifier(ABC):
-    def __init__(self, n_cols, coord, max_len, dtype=np.float32, start=0, end=None):
+    def __init__(self, n_cols: int, coord: object, max_len: int, dtype: np.dtype = np.float32,
+                 start: int = 0, end: int | None = None) -> None:
         if end is None:
             end = coord.length
         assert isinstance(n_cols, int)
@@ -69,11 +71,11 @@ class Numerifier(ABC):
         super().__init__()
 
     @abstractmethod
-    def coord_to_matrices(self):
+    def coord_to_matrices(self) -> dict | tuple:
         """Method to be called from outside. Numerifies both strands."""
         pass
 
-    def _slice_matrices(self, is_plus_strand, *argv):
+    def _slice_matrices(self, is_plus_strand: bool, *argv: np.ndarray) -> list[list[np.ndarray]]:
         """Slices (potentially) multiple matrices in the same way according to self.paired_steps"""
         assert len(argv) > 0, 'Need a matrix to slice'
         all_slices = [[] for _ in range(len(argv))]
@@ -88,20 +90,21 @@ class Numerifier(ABC):
                 slices.append(data_slice)
         return all_slices
 
-    def _zero_matrix(self):
+    def _zero_matrix(self) -> None:
         self.matrix = np.zeros((self.length, self.n_cols,), self.dtype)
 
-def seq_numerify(seq_part):
+def seq_numerify(seq_part: str) -> np.ndarray:
     as_list = [AMBIGUITY_DECODE[c] for c in seq_part]
     return np.array(as_list, np.float16)
 
 
 class SequenceNumerifier(Numerifier):
-    def __init__(self, coord, max_len, start=0, end=None, use_multiprocess=True):
+    def __init__(self, coord: object, max_len: int, start: int = 0, end: int | None = None,
+                 use_multiprocess: bool = True) -> None:
         self.use_multiprocess = use_multiprocess
         super().__init__(n_cols=4, coord=coord, max_len=max_len, dtype=np.float16, start=start, end=end)
 
-    def coord_to_matrices(self):
+    def coord_to_matrices(self) -> dict[str, list[np.ndarray]]:
         """Does not alter the error mask unlike in AnnotationNumerifier"""
 
         # plus strand, actual numerification of the sequence
@@ -135,7 +138,7 @@ class SequenceNumerifier(Numerifier):
 
         # put everything together
         data = {'plus': data_plus, 'minus': data_minus}
-        print(f'Numerification of {self.start}-{self.end} of the sequence of {self.coord.seqid} '
+        logger.info(f'Numerification of {self.start}-{self.end} of the sequence of {self.coord.seqid} '
               f'took {time.time() - start_time:.2f} secs')
         return data
 
@@ -156,24 +159,25 @@ class AnnotationNumerifier(Numerifier):
     #  Second pass could also be written to h5 in a second round to reduce mem usage if need be. Or first pass is
     #  a generator that autodetects splittable intergenic regions every 10mb or so.
 
-    def __init__(self, coord, features, max_len, one_hot=True, start=0, end=None):
+    def __init__(self, coord: object, features: list, max_len: int, one_hot: bool = True,
+                 start: int = 0, end: int | None = None) -> None:
         super().__init__(n_cols=3, coord=coord, max_len=max_len, dtype=np.int8, start=start, end=end)
         self.features = features
         self.one_hot = one_hot
         self.coord = coord
         self.error_mask = None
 
-    def _zero_matrix(self):
+    def _zero_matrix(self) -> None:
         super()._zero_matrix()
         # 0 means error so this can be used directly as sample weight later on
         self.error_mask = np.ones((self.length,), np.int8)
 
-    def _init_additional_data(self):
+    def _init_additional_data(self) -> None:
         self.gene_lengths = np.zeros(self.length, dtype=np.uint32)
         self.phases = np.zeros((self.length, 4), dtype=np.int8)
         self.phases[:, 0] = 1  # set no phase encoding as default
 
-    def coord_to_matrices(self):
+    def coord_to_matrices(self) -> tuple[dict[str, list[np.ndarray]], ...]:
         """Always numerifies both strands one after the other."""
         plus_strand = self._encode_strand(True)
         minus_strand = self._encode_strand(False)
@@ -182,7 +186,7 @@ class AnnotationNumerifier(Numerifier):
         combined_data = tuple(({'plus': plus_strand[i], 'minus': minus_strand[i]} for i in range(len(plus_strand))))
         return combined_data
 
-    def _encode_strand(self, is_plus_strand):
+    def _encode_strand(self, is_plus_strand: bool) -> list[list[np.ndarray]]:
         self._zero_matrix()
         self._init_additional_data()
         self._update_matrix_and_error_mask(is_plus_strand=is_plus_strand)
@@ -202,7 +206,7 @@ class AnnotationNumerifier(Numerifier):
                                         binary_transition_matrix)
         return matrices
 
-    def _update_matrix_and_error_mask(self, is_plus_strand):
+    def _update_matrix_and_error_mask(self, is_plus_strand: bool) -> None:
         def start_end_of_feature(feature):
             start = feature.start - self.start  # self.start used as offset for writing chunk
             end = feature.end - self.start
@@ -262,7 +266,7 @@ class AnnotationNumerifier(Numerifier):
                     cds_phase_one_hot = cds_phase_one_hot[overhang:]
             self.phases[start:end][cds_idx] = cds_phase_one_hot
 
-    def _encode_onehot4(self):
+    def _encode_onehot4(self) -> np.ndarray:
         # Class order: Intergenic, UTR, CDS, (non-coding Intron), Intron
         # This could be done in a more efficient way, but this way we may catch bugs
         # where non-standard classes are output in the multiclass output
@@ -282,7 +286,7 @@ class AnnotationNumerifier(Numerifier):
         one_hot4_matrix = one_hot_matrix.astype(np.int8)
         return one_hot4_matrix
 
-    def _encode_transitions(self):
+    def _encode_transitions(self) -> np.ndarray:
         # self.matrix has base-wise binary encoding of [geenuff_transcript, geenuff_cds, geenuff_intron]
         # shift by one and subtract to get transitions out
         diffs = self.matrix - np.roll(self.matrix, shift=-1, axis=0)  # roll is fine, bc last position is never used
@@ -313,12 +317,12 @@ class AnnotationNumerifier(Numerifier):
 
 class MatAndInfo:
     """organizes data and meta info for post-processing and saving a matrix"""
-    def __init__(self, key, matrix, dtype):
+    def __init__(self, key: str, matrix: np.ndarray, dtype: str) -> None:
         self.key = key
         self.matrix = matrix
         self.dtype = dtype
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "key: {}, matrix shape: {}, matrix dtype {}: target dtype {}".format(self.key, self.matrix.shape,
                                                                                     self.matrix.dtype, self.dtype)
 
@@ -329,7 +333,7 @@ class CoordNumerifier(object):
     """
 
     @staticmethod
-    def pad(d, chunk_size):
+    def pad(d: list[np.ndarray], chunk_size: int) -> np.ndarray:
         n_seqs = len(d)
         # insert all the sequences so that 0-padding is added if needed
         shape = tuple([n_seqs, chunk_size] + list(d[0].shape[1:]))
@@ -339,7 +343,7 @@ class CoordNumerifier(object):
         return padded_d
 
     @staticmethod
-    def start_ends(numerifier, strand):
+    def start_ends(numerifier: Numerifier, strand: str) -> np.ndarray:
         assert isinstance(numerifier, Numerifier)
         if strand == 'plus':
             start_ends = numerifier.paired_steps
@@ -350,14 +354,17 @@ class CoordNumerifier(object):
         return start_ends
 
     @staticmethod
-    def seq_matinfos(coord, genome, start_ends, length):
+    def seq_matinfos(coord: object, genome: str, start_ends: np.ndarray,
+                     length: int) -> list[MatAndInfo]:
         res = [MatAndInfo('species', np.array([genome.encode('ASCII')] * length), 'S25'),
                MatAndInfo('seqids', np.array([coord.seqid.encode('ASCII')] * length), 'S50'),
                MatAndInfo('start_ends', start_ends, 'int64')]
         return res
 
     @staticmethod
-    def numerify_only_fasta(coord, max_len, genome, one_hot=True, use_multiprocess=False, write_by=20000000):
+    def numerify_only_fasta(coord: object, max_len: int, genome: str, write_by: int,
+                            one_hot: bool = True,
+                            use_multiprocess: bool = False) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
         """export the FASTA sequence only"""
         # passing empty features causes SplitFinder to consider noting more than splitting
         # to max length of write_by and end of sequence handling.
@@ -377,8 +384,10 @@ class CoordNumerifier(object):
                 yield tuple(out), h5_coord[strand]
 
     @staticmethod
-    def numerify(coord, coord_features, max_len, one_hot=True, mode=('X', 'y', 'anno_meta', 'transitions'),
-                 write_by=5000000, use_multiprocess=True):
+    def numerify(coord: object, coord_features: list, max_len: int, write_by: int,
+                 one_hot: bool = True,
+                 mode: tuple[str, ...] = ('X', 'y', 'anno_meta', 'transitions'),
+                 use_multiprocess: bool = True) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
         assert isinstance(max_len, int) and max_len > 0, 'what is {} of type {}'.format(max_len, type(max_len))
         coord_features = sorted(coord_features, key=lambda f: min(f.start, f.end))  # sort by ~ +strand start
         split_finder = SplitFinder(features=coord_features, write_by=write_by, coord_length=coord.length,
@@ -390,8 +399,11 @@ class CoordNumerifier(object):
                 yield strand_res
 
     @staticmethod
-    def _numerify_super_write_chunk(f_set, bp_coord, h5_coord, coord, max_len, one_hot, coord_features, mode,
-                                    use_multiprocess):
+    def _numerify_super_write_chunk(f_set: list, bp_coord: tuple[int, int],
+                                    h5_coord: dict[str, tuple[int, int]], coord: object,
+                                    max_len: int, one_hot: bool, coord_features: list,
+                                    mode: tuple[str, ...],
+                                    use_multiprocess: bool) -> Iterator[tuple[tuple[MatAndInfo, ...], tuple[int, int]]]:
         export_x = 'X' in mode
         start, end = bp_coord
 
@@ -419,7 +431,7 @@ class CoordNumerifier(object):
 
             # mark examples from featureless coordinate / assume there is no trustworthy annotation
             if not coord_features:
-                logging.warning('Sequence {} has no annotations'.format(coord.seqid))
+                logger.warning('Sequence {} has no annotations'.format(coord.seqid))
                 is_annotated = [0] * len(y)
             else:
                 is_annotated = [1] * len(y)
@@ -428,10 +440,11 @@ class CoordNumerifier(object):
             # additional derived matrices
             err_samples = np.any(sample_weights, axis=1)
             # just one entry per chunk
-            if one_hot:
-                fully_intergenic_samples = np.all(y[:, :, 0] == 0, axis=1)
-            else:
-                fully_intergenic_samples = np.all(y[:, :, 0] == 1, axis=1)
+            if one_hot:  # question: when isn't it one hot encoded?
+                is_first_class_position_intergenic = 1
+                fully_intergenic_samples = np.all(y[:, :, 0] == is_first_class_position_intergenic, axis=1)
+            else:  # will never be executed with the current setup
+                fully_intergenic_samples = np.all(y[:, :, 0] == 1, axis=1)  # todo: might be wrong, but is never called
 
             # do not output the input_masks as it is not used for anything
             out = [MatAndInfo('y', y, 'int8'),  # y should always be first (bc currently we always want it)
@@ -451,30 +464,30 @@ class CoordNumerifier(object):
 
 # todo, consider moving to separate splitting file or exporter...?
 class SplitFinder:
-    def __init__(self, features, write_by, coord_length, chunk_size):
+    def __init__(self, features: list | tuple, write_by: int, coord_length: int, chunk_size: int) -> None:
         if write_by % chunk_size:
             old_write_by = write_by
             write_by = chunk_size * (write_by // chunk_size)
-            logging.info(f'parameter "write_by" changed from {old_write_by} to {write_by} to be a multiple'
-                         f'of "subsequence length" {chunk_size}')
+            logger.info(f'parameter "write_by" changed from {old_write_by} to {write_by} to be a multiple'
+                        f'of "subsequence length" {chunk_size}')
         self.features = features
         self.write_by = write_by  # target writing this many bp to the h5 file at once
         self.coord_length = coord_length
         self.chunk_size = chunk_size
         self.splits = tuple(self._find_splits())
-        print(len(self.splits), 'expected num of chunks to write in', self.write_by, 'bases to hdf5')
+        logger.info(f'{len(self.splits)} expected num of chunks to write in {self.write_by} bases to hdf5')
         self.relative_h5_coords = tuple(self._get_rel_h5_coords_for_splits())
 
     @property
-    def coords(self):
+    def coords(self) -> tuple[tuple[int, int], ...]:
         starts = [0] + list(self.splits)[:-1]
         return tuple(zip(starts, self.splits))
 
-    def feature_n_coord_gen(self):
+    def feature_n_coord_gen(self) -> Iterator[tuple]:
         """generator for feature subset, bp coordinates, and h5 coordinates (for +/-)"""
         return zip(self.split_features(), self.coords, self.relative_h5_coords)
 
-    def split_features(self):
+    def split_features(self) -> Iterator[list]:
         """get all features from start of list that aren't passed _to_"""
         i = 0
         in_split = []
@@ -491,13 +504,13 @@ class SplitFinder:
             in_split = in_next_split
             in_next_split = []
 
-    def _ith_feature_or_none(self, i):
+    def _ith_feature_or_none(self, i: int) -> object | None:
         try:
             return self.features[i]
         except IndexError:
             return None
 
-    def _get_rel_h5_coords_for_splits(self):
+    def _get_rel_h5_coords_for_splits(self) -> Iterator[dict[str, tuple[int, int]]]:
         """calculates where to write the +/- strand super-chunk splits in the h5 file"""
         # calculate the positive strand first
         postive_h5_ends = []
@@ -517,7 +530,7 @@ class SplitFinder:
         return ({'plus': x[0], 'minus': x[1]} for x in zip(postive_h5s, negative_h5s))
 
     @staticmethod
-    def _feature_not_past(feature, to):
+    def _feature_not_past(feature: object | None, to: int) -> bool:
         """whether feature is before or overlaps end by any measure"""
         if feature is None:
             return False  # force break of while loop when out of features
@@ -529,7 +542,7 @@ class SplitFinder:
             return feature.end < to
 
     @staticmethod
-    def _feature_ends_after(feature, to):
+    def _feature_ends_after(feature: object, to: int) -> bool:
         """combines with _feature_not_past to define overlaps of trailing edge 'to'"""
         # overlapping features will be saved and numerified with the next write_by split as well
         if feature.is_plus_strand:
@@ -538,7 +551,7 @@ class SplitFinder:
         else:
             return feature.start >= to
 
-    def _find_splits(self):
+    def _find_splits(self) -> Iterator[int]:
         """yields splits of ~write_by size that can be safely split at"""
         tr_mask = self._transition_and_split_cds_mask()
         for i in range(self.write_by, self.coord_length, self.write_by):
@@ -551,7 +564,7 @@ class SplitFinder:
                         break
         yield self.coord_length
 
-    def _transition_and_split_cds_mask(self):
+    def _transition_and_split_cds_mask(self) -> set[int]:
         """mark all possible splits where there is a transition, so splitting there would change the numerify results"""
         tr_mask = set()
         for feature in self.features:
@@ -575,7 +588,7 @@ class SplitFinder:
         return tr_mask
 
     @staticmethod
-    def _plus_strand_transitions(feature):
+    def _plus_strand_transitions(feature: object) -> tuple[int, int]:
         if feature.is_plus_strand:
             return feature.start, feature.end
         else:

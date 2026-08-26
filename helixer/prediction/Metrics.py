@@ -1,16 +1,19 @@
 import sys
-
+import logging
 import numpy as np
 import os
 import csv
 from collections import defaultdict
 from terminaltables import AsciiTable
 from scipy.sparse import coo_matrix
+from tensorflow.keras.models import Model
+from tensorflow.keras.utils import Sequence
+
+logger = logging.getLogger('HelixerLogger')
 
 
 class ConfusionMatrix:
-
-    def __init__(self, col_names=None, skip_uncertainty=True):
+    def __init__(self, col_names: list[str] | None = None, skip_uncertainty: bool = True) -> None:
         if col_names is None:
             col_names = ['ig', 'utr', 'exon', 'intron']
         self.col_names = {i: name for i, name in enumerate(col_names)}
@@ -61,7 +64,7 @@ class ConfusionMatrix:
                 avg_entropy /= self.max_uncertainty  # normalize by maximum for comparability
                 self.uncertainties[name].append(avg_entropy)
 
-    def count_and_calculate_one_batch(self, y_true, y_pred, sw):
+    def count_and_calculate_one_batch(self, y_true: np.ndarray, y_pred: np.ndarray, sw: np.ndarray) -> None:
         y_true, y_pred = ConfusionMatrix._remove_masked_bases(y_true, y_pred, sw)
         if not self.skip_uncertainty:
             # important to copy so _add_to_cm() works
@@ -119,14 +122,14 @@ class ConfusionMatrix:
 
     def _print_results(self, scores):
         for table, table_name in self.prep_tables(scores):
-            print('\n', AsciiTable(table, table_name).table, sep='')
-        print('Total acc: {:.4f}'.format(self._total_accuracy()))
+            logger.info('\n\n' + AsciiTable(table, table_name).table + '\n')
+        logger.info('Total acc: {:.4f}'.format(self._total_accuracy()))
 
-    def print_cm(self):
+    def print_cm(self) -> None:
         scores = self._get_scores()
         self._print_results(scores)
 
-    def prep_tables(self, scores):
+    def prep_tables(self, scores: dict) -> list[tuple[list[list], str]]:
         out = []
         names = list(self.col_names.values())
 
@@ -158,7 +161,7 @@ class ConfusionMatrix:
 
         return out
 
-    def export_to_csvs(self, pathout):
+    def export_to_csvs(self, pathout: str | None) -> None:
         if pathout is not None:
             if not os.path.exists(pathout):
                 os.makedirs(pathout)
@@ -201,9 +204,10 @@ class ConfusionMatrixGenic(ConfusionMatrix):
 
         return scores
 
+
 class ConfusionMatrixPhase(ConfusionMatrix):
     """Extension of ConfusionMatrix to differentiate phase shift from CDS vs not mistake"""
-    def __init__(self, skip_uncertainty=True):
+    def __init__(self, skip_uncertainty: bool = True) -> None:
         super().__init__(col_names = ["no_phase", "phase_0", "phase_1", "phase_2"],
                          skip_uncertainty=skip_uncertainty)
 
@@ -245,9 +249,10 @@ class ConfusionMatrixPhase(ConfusionMatrix):
 
         return scores
 
-class Metrics:
 
-    def __init__(self, generator, print_to_stdout=True, skip_uncertainty=True):
+class Metrics:
+    def __init__(self, generator: Sequence, print_to_stdout: bool = True,
+                 skip_uncertainty: bool = True) -> None:
         np.set_printoptions(suppress=True)  # do not use scientific notation for the print out
         self.generator = generator
         self.print_to_stdout = print_to_stdout
@@ -269,13 +274,13 @@ class Metrics:
         y_true = self.generator.ol_helper.subset_input(batch_idx, y_true)
         return y_true, y_pred, sw
 
-    def calculate_metrics(self, model):
+    def calculate_metrics(self, model: Model) -> dict:
         for batch_idx in range(len(self.generator)):
-            print(batch_idx, '/', len(self.generator) - 1, end="\r")
+            print(batch_idx + 1, '/', len(self.generator), end="\r", flush=True)
 
             inputs = self.generator[batch_idx]
             if len(inputs) == 2 and type(inputs[0]) is list:
-                mode = 'dialated_conv'
+                mode = 'dilated_conv'
                 (X, sw), y_true = inputs
                 y_pred = model.predict_on_batch([X, sw])
             elif len(inputs) == 3:
@@ -292,8 +297,7 @@ class Metrics:
                     X, y_true, sw = inputs
                     y_pred = model.predict_on_batch(X)
             else:
-                print(f'Unknown inputs from keras sequence: {inputs}', file=sys.stderr)
-                exit()
+                raise ValueError(f'Unknown inputs from keras sequence: {inputs}')
 
             data = {'genic_base_wise': [self.cm_genic, (y_true, y_pred)]}
             if mode == 'phase':
@@ -305,6 +309,7 @@ class Metrics:
                 if self.generator.overlap:
                     y_true, y_pred, sw_copy = self._overlap_all_data(batch_idx, y_true, y_pred, sw_copy)
                 cm.count_and_calculate_one_batch(y_true, y_pred, sw_copy)
+        print('\n', flush=True)
 
         # data contains cms + metric
         for metric_name, (cm, (_, _)) in data.items():
