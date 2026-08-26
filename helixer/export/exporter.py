@@ -1,28 +1,33 @@
 import os
+import sys
 import time
 import h5py
 import numpy as np
 import sqlite3
 import datetime
 import subprocess
+import logging
+from collections.abc import Iterator
 from importlib.metadata import version
 
 import geenuff
 import helixer
 from geenuff.applications.exporter import GeenuffExportController
 from geenuff.applications.importer import FastaImporter
-from .numerify import CoordNumerifier
+from .numerify import CoordNumerifier, MatAndInfo
+
+logger = logging.getLogger('HelixerLogger')
 
 
 class HelixerExportControllerBase(object):
 
-    def __init__(self, input_path, output_path, match_existing=False):
+    def __init__(self, input_path: str, output_path: str, match_existing: bool = False) -> None:
         self.input_path = input_path
         self.output_path = output_path
         self.match_existing = match_existing
 
     @staticmethod
-    def calc_n_chunks(coord_len, chunk_size):
+    def calc_n_chunks(coord_len: int, chunk_size: int) -> int:
         """calculates the number of chunks resulting from a coord len and chunk size"""
         n_chunks = coord_len // chunk_size
         if coord_len % chunk_size:
@@ -31,7 +36,8 @@ class HelixerExportControllerBase(object):
         return n_chunks
 
     @staticmethod
-    def _create_dataset(h5_file, key, matrix, dtype, compression='gzip', create_empty=True):
+    def _create_dataset(h5_file: h5py.File, key: str, matrix: np.ndarray, dtype: str,
+                        compression: str = 'gzip', create_empty: bool = True) -> None:
         shape = list(matrix.shape)
         shuffle = len(shape) > 1
         if create_empty:
@@ -44,7 +50,8 @@ class HelixerExportControllerBase(object):
                                compression=compression,
                                shuffle=shuffle)  # only for the compression
 
-    def _create_or_expand_datasets(self, h5_group, flat_data, n_chunks, compression='gzip'):
+    def _create_or_expand_datasets(self, h5_group: str, flat_data: list[MatAndInfo],
+                                   n_chunks: int, compression: str = 'gzip') -> None:
         if h5_group not in self.h5 or len(self.h5[h5_group].keys()) == 0:
             for mat_info in flat_data:
                 self._create_dataset(self.h5, h5_group + mat_info.key, mat_info.matrix, mat_info.dtype, compression)
@@ -54,8 +61,9 @@ class HelixerExportControllerBase(object):
         for mat_info in flat_data:
             self.h5[h5_group + mat_info.key].resize(old_len + n_chunks, axis=0)
 
-    def _save_data(self, flat_data, h5_coords, n_chunks, first_round_for_coordinate, compression='gzip',
-                   h5_group='/data/'):
+    def _save_data(self, flat_data: list[MatAndInfo], h5_coords: tuple[int, int], n_chunks: int,
+                   first_round_for_coordinate: bool, compression: str = 'gzip',
+                   h5_group: str = '/data/') -> None:
         assert len(set(mat_info.matrix.shape[0] for mat_info in flat_data)) == 1, 'unequal data lengths'
 
         if first_round_for_coordinate:
@@ -71,7 +79,7 @@ class HelixerExportControllerBase(object):
             self.h5[h5_group + mat_info.key][start:end] = mat_info.matrix
         self.h5.flush()
 
-    def _add_data_attrs(self):
+    def _add_data_attrs(self) -> None:
         attrs = {
             'timestamp': str(datetime.datetime.now()),
             'input_path': self.input_path
@@ -86,9 +94,9 @@ class HelixerExportControllerBase(object):
                     strip().decode()
             except subprocess.CalledProcessError:
                 attrs[module.__name__ + '_commit'] = 'commit not found, version: {}'.format(
-                    version(module.__name__) 
+                    version(module.__name__)
                 )
-                print('logged installed version in place of git commit for {}'.format(module.__name__))
+                logger.info('logged installed version in place of git commit for {}'.format(module.__name__))
         os.chdir(pwd)
         # insert attrs into .h5 file
         for key, value in attrs.items():
@@ -99,40 +107,58 @@ class HelixerFastaToH5Controller(HelixerExportControllerBase):
 
     class CoordinateSurrogate(object):
         """Mimics some functionality of the Coordinate orm class, so we can go directly from FASTA to H5"""
-        def __init__(self, seqid, seq):
+        def __init__(self, seqid: str, seq: str) -> None:
             self.seqid = seqid
             self.sequence = seq
             self.length = len(seq)
 
-        def __repr__(self):
+        def __repr__(self) -> str:
             return f'Fasta only Coordinate (seqid: {self.seqid}, len: {self.length})'
 
-    def export_fasta_to_h5(self, chunk_size, compression, multiprocess, species):
+    def export_fasta_to_h5(self, chunk_size: int, compression: str, multiprocess: bool,
+                           species: str, write_by: int) -> None:
+        assert write_by >= chunk_size, ("when specifying '--write-by' it needs to be larger than "
+                                        "or equal to '--subsequence-length'")
         fasta_importer = FastaImporter(None)
         fasta_seqs = fasta_importer.parse_fasta(self.input_path)
         self.h5 = h5py.File(self.output_path, 'w')
 
+        seqids = []
         for i, (seqid, seq) in enumerate(fasta_seqs):
+            if seqid in seqids:
+                raise ValueError(f"found duplicate seqid '{seqid}' in fasta file '{self.input_path}', "
+                                 f"please remove or rename it")
+            seqids.append(seqid)
             start_time = time.time()
             coord = HelixerFastaToH5Controller.CoordinateSurrogate(seqid, seq)
             n_chunks = HelixerExportControllerBase.calc_n_chunks(coord.length, chunk_size)
-            data_gen = CoordNumerifier.numerify_only_fasta(coord, chunk_size, species, use_multiprocess=multiprocess)
+            data_gen = CoordNumerifier.numerify_only_fasta(coord, chunk_size, species,
+                                                           use_multiprocess=multiprocess, write_by=write_by)
             for j, strand_res in enumerate(data_gen):
                 data, h5_coords = strand_res
                 self._save_data(data, h5_coords=h5_coords, n_chunks=n_chunks,
                                 first_round_for_coordinate=(j == 0), compression=compression)
-            print(f'{i + 1} Numerified {coord} in {time.time() - start_time:.2f} secs', end='\n\n')
+            logger.info(f'{i + 1} Numerified {coord} in {time.time() - start_time:.2f} secs\n')
         self._add_data_attrs()
+        self.h5.flush()
+        # os anti-race-condition sync trial
+        try:
+            fid = self.h5.id.get_vfd_handle()
+            os.fsync(fid)
+        except Exception:
+            pass  # silently skip if os sync is not supported
         self.h5.close()
 
 
 class HelixerExportController(HelixerExportControllerBase):
 
-    def __init__(self, input_path, output_path, match_existing=False, h5_group='/data/'):
+    def __init__(self, input_path: str, output_path: str, match_existing: bool = False,
+                 h5_group: str = '/data/') -> None:
         super().__init__(input_path, output_path, match_existing)
         self.h5_group = h5_group
         input_db_path = self.input_path
         self.h5_coord_offset = 0
+        self.output_path = output_path
 
         # check db
         conn = sqlite3.connect(input_db_path)
@@ -150,9 +176,9 @@ class HelixerExportController(HelixerExportControllerBase):
             self.h5 = h5py.File(output_path, 'a')
         else:
             self.h5 = h5py.File(output_path, 'w')
-        print(f'Exporting all data to {output_path}')
+        logger.info(f'Exporting all data to {output_path}')
 
-    def _coord_info(self, coords_features):
+    def _coord_info(self, coords_features: dict[tuple[int, int], list]) -> dict[bytes, tuple[int, int]]:
         coord_info = {}
         for coord_id, coord_len in coords_features.keys():
             coord = self.exporter.get_coord_by_id(coord_id)
@@ -160,10 +186,12 @@ class HelixerExportController(HelixerExportControllerBase):
             coord_info[seqid] = (coord_id, coord_len)
         return coord_info
 
-    def _numerify_coord(self, coord, coord_features, chunk_size, one_hot, write_by, modes, multiprocess):
+    def _numerify_coord(self, coord: object, coord_features: list, chunk_size: int, one_hot: bool,
+                        write_by: int, modes: tuple[str, ...],
+                        multiprocess: bool) -> Iterator[tuple[tuple[MatAndInfo, ...], object, float, float, tuple[int, int]]]:
         """filtering and stats"""
-        coord_data_gen = CoordNumerifier.numerify(coord, coord_features, chunk_size, one_hot,
-                                                  write_by=write_by, mode=modes, use_multiprocess=multiprocess)
+        coord_data_gen = CoordNumerifier.numerify(coord, coord_features, chunk_size, write_by,
+                                                  one_hot=one_hot, mode=modes, use_multiprocess=multiprocess)
         # the following will all be used to calculated a percentage, which is yielded but ignored until the end
         n_chunks = n_bases = n_ig_bases = n_masked_bases = 0
 
@@ -179,15 +207,18 @@ class HelixerExportController(HelixerExportControllerBase):
             n_bases += np.prod(y.shape[:2]) - padded_bases
             n_masked_bases += np.count_nonzero(sample_weights == 0) - padded_bases
 
-            masked_bases_perc = n_masked_bases / n_bases * 100
-            ig_bases_perc = n_ig_bases / n_bases * 100
+            # n_bases can be zero if one_hot = False, as fully intergenic subsequences are indistinguishable
+            # from padding then (e.g. [0,0,0])
+            masked_bases_perc = n_masked_bases / ((n_bases * 100) + 1e-6)  # avoid division by 0
+            ig_bases_perc = n_ig_bases / ((n_bases * 100) + 1e-6)
 
             yield coord_data, coord, masked_bases_perc, ig_bases_perc, h5_coord
 
-    def export(self, chunk_size, one_hot=True, longest_only=True, write_by=10_000_000_000,
-               modes=('X', 'y', 'anno_meta', 'transitions'), compression='gzip', multiprocess=True):
+    def export(self, chunk_size: int, write_by: int, one_hot: bool = True, longest_only: bool = True,
+               modes: tuple[str, ...] = ('X', 'y', 'anno_meta', 'transitions'),
+               compression: str = 'gzip', multiprocess: bool = True) -> int:
         coords_features = self.exporter.genome_query(longest_only=longest_only)
-        print(f'\n{len(coords_features)} coordinates chosen to numerify')
+        logger.info(f'\n{len(coords_features)} coordinates chosen to numerify')
         if self.match_existing:
             # resort coordinates to match existing
             seqids = self.h5['data/seqids'][:]
@@ -213,12 +244,24 @@ class HelixerExportController(HelixerExportControllerBase):
                                 compression=compression, h5_group=self.h5_group)
                 n_writing_chunks += 1
 
-            print(f'{n_coords_done}/{len(coords_features)} Numerified {coord} '
-                  f"with {len(coord.features)} features in {flat_data[0].matrix.shape[0]} chunks, "
-                  f'masked rate: {masked_bases_perc:.2f}%, ig rate: {ig_bases_perc:.2f}%, '
-                  f'({time.time() - start_time:.2f} secs)', end='\n\n')
+            logger.info(f'{n_coords_done}/{len(coords_features)} Numerified {coord} '
+                        f'with {len(coord.features)} features in {flat_data[0].matrix.shape[0]} chunks, '
+                        f'masked rate: {masked_bases_perc:.2f}%, ig rate: {ig_bases_perc:.2f}%, '
+                        f'({time.time() - start_time:.2f} secs)\n')
             n_coords_done += 1
         self._add_data_attrs()
+        self.h5.flush()
+        # os anti-race-condition sync trial
+        try:
+            fid = self.h5.id.get_vfd_handle()
+            os.fsync(fid)
+        except Exception:
+            pass  # silently skip if os sync is not supported
         self.h5.close()
-        print('Export from geenuff db to h5 file(s) with numeric matrices finished successfully.')
+
+        # os anti-race-condition sync trial
+        fd = os.open(self.output_path, os.O_RDONLY)
+        os.fsync(fd)
+        os.close(fd)
+        logger.info('Export from geenuff db to h5 file(s) with numeric matrices finished successfully.')
         return n_writing_chunks  # for testing only atm

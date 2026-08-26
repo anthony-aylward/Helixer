@@ -5,21 +5,25 @@ import shutil
 import sys
 import time
 import h5py
+import argparse
 import tempfile
 import subprocess
 from termcolor import colored
+from pprint import pformat
+import logging.config
 
 from helixer.core.scripts import ParameterParser
-from helixer.core.data import prioritized_models, report_if_current_not_best, identify_current, MODEL_PATH
+from helixer.core.data import prioritized_models, report_if_current_not_best, identify_current, set_model_path
 from helixer.prediction.HybridModel import HybridModel
 from helixer.export.exporter import HelixerFastaToH5Controller
+from helixer.core.helpers import get_log_dict
 
 
 class HelixerParameterParser(ParameterParser):
-    def __init__(self, config_file_path=''):
+    def __init__(self, config_file_path: str = '') -> None:
         super().__init__(config_file_path)
         self.io_group.add_argument('--fasta-path', type=str, required=True, help='FASTA input file.')
-        self.io_group.add_argument('--gff-output-path', type=str, required=True, help='Output GFF file path.')
+        self.io_group.add_argument('--gff-output-path', type=str, required=True, help='Output GFF3 file path.')
         self.io_group.add_argument('--species', type=str, help='Species name.')
         self.io_group.add_argument('--temporary-dir', type=str,
                                    help='use supplied (instead of system default) for temporary directory')
@@ -29,6 +33,12 @@ class HelixerParameterParser(ParameterParser):
                                           'typical genic loci. Tested up to 213840. Must be evenly divisible by the '
                                           'timestep width of the used model, which is typically 9. (Default is '
                                           'lineage dependent from 21384 to 213840).')
+        self.data_group.add_argument('--write-by', type=int,
+                                     help='convert genomic sequence in super-chunks to numerical matrices with this '
+                                          'many base pairs, which will be rounded to be divisible by '
+                                          'subsequence-length; needs to be equal to or larger than '
+                                          'subsequence length; for lower memory consumption, consider setting a '
+                                          'lower number')
         self.data_group.add_argument('--lineage', type=str, default=None,
                                      choices=['vertebrate', 'land_plant', 'fungi', 'invertebrate'],
                                      help='What model to use for the annotation.')
@@ -36,10 +46,18 @@ class HelixerParameterParser(ParameterParser):
                                      help='set this to override the default model for any given '
                                           'lineage and instead take a specific model',
                                      type=str)
+        self.data_group.add_argument('--downloaded-model-path', type=str,
+                                     help='set to override the default download directory (<users_home_directory>/'
+                                          '.local/share/Helixer/models) Helixer is checking to see if you use the '
+                                          'newest model; only works with --lineage')
         self.pred_group = self.parser.add_argument_group("Prediction parameters")
         self.pred_group.add_argument('--batch-size', type=int,
                                      help='The batch size for the raw predictions in TensorFlow. Should be as large as '
-                                          'possible on your GPU to save prediction time. (Default is 8.)')
+                                          'possible on your GPU to save prediction time. (Default is 32.)')
+        self.pred_group.add_argument('--deterministic', action='store_true',
+                                     help='enable deterministic GPU operations; reproducible across runs '
+                                          'on GPUs that are not deterministic by default; '
+                                          'may be slower on some GPU architectures')
         self.data_group.add_argument('--no-overlap', action='store_true',
                                      help='Switches off the overlapping after predictions are made. Predictions without'
                                           ' overlapping will be faster, but will have lower quality towards '
@@ -54,46 +72,55 @@ class HelixerParameterParser(ParameterParser):
                                           'quality if overlapping is enabled. Smaller values may lead to better '
                                           'predictions but will take longer. Has to be smaller than subsequence_length '
                                           '(Default is subsequence_length * 3 / 4)')
-        self.pred_group.add_argument('--debug', action='store_true', help='add this to quickly the code runs through'
-                                                                          'without loading/predicting on the full file')
 
-        self.post_group = self.parser.add_argument_group("Post processing parameters")
-        self.post_group.add_argument('--window-size', type=int, help='')
-        self.post_group.add_argument('--edge-threshold', type=float, help='')
-        self.post_group.add_argument('--peak-threshold', type=float, help='')
-        self.post_group.add_argument('--min-coding-length', type=int, help='')
+        self.post_group = self.parser.add_argument_group("Post-processing parameters")
+        self.post_group.add_argument('--window-size', type=int,
+                                     help='width of the sliding window that is assessed for intergenic vs genic '
+                                          '(UTR/Coding Sequence/Intron) content')
+        self.post_group.add_argument('--edge-threshold', type=float,
+                                     help='threshold specifies the genic score which defines the start/end boundaries '
+                                          'of each candidate region within the sliding window')
+        self.post_group.add_argument('--peak-threshold', type=float,
+                                     help='threshold specifies the minimum peak genic score required to accept the '
+                                          'candidate region; the candidate region is accepted if it contains at least '
+                                          'one window with a genic score above this threshold')
+        self.post_group.add_argument('--min-coding-length', type=int,
+                                     help='output is filtered to remove genes with a total coding length shorter '
+                                          'than this value')
 
         helixer_defaults = {
             'fasta_path': '',
             'temporary_dir': None,
             'species': '',
             'subsequence_length': None,
+            'write_by': 20_000_000,
             'lineage': None,
             'model_filepath': None,
+            'downloaded_model_path': None,
             'batch_size': 32,
+            'deterministic': False,
             'no_overlap': False,
-            'debug': False,
             'overlap_offset': None,
             'overlap_core_length': None,
             'window_size': 100,
             'edge_threshold': 0.1,
             'peak_threshold': 0.8,
-            'min_coding_length': 100,
+            'min_coding_length': 60,
         }
         self.defaults = {**self.defaults, **helixer_defaults}
 
     @staticmethod
-    def check_for_lineage_model(lineage):
+    def check_for_lineage_model(lineage: str, downloaded_model_path: str) -> str:
         # which models are available?
-        priorty_ms = prioritized_models(lineage)
+        model_path = set_model_path(downloaded_model_path)
+        priorty_ms = prioritized_models(lineage, model_path)
         # which model is already downloaded / will be used?
-        current_model = identify_current(lineage, priorty_ms)
+        current_model = identify_current(lineage, priorty_ms, model_path)
         # provide feedback if not up to date, error out if missing
         report_if_current_not_best(priorty_ms, current_model)
+        return os.path.join(model_path, lineage, current_model)
 
-        return os.path.join(MODEL_PATH, lineage, current_model)
-
-    def check_args(self, args):
+    def check_args(self, args: argparse.Namespace) -> None:
 
         if args.model_filepath is not None:
             print(f'overriding the lineage based model, '
@@ -104,8 +131,9 @@ class HelixerParameterParser(ParameterParser):
                   'genomic loci. E.g. 21384, 64152, or 213840 for fungi, plants, and animals, respectively.'
             assert args.subsequence_length is not None, msg
         else:
-            assert args.lineage is not None, "Either --lineage or --model-filepath is required. Run `Helixer.py --help` to see lineage options."
-            model_filepath = self.check_for_lineage_model(args.lineage)
+            assert args.lineage is not None, ("Either --lineage or --model-filepath is required. Run `Helixer.py "
+                                              "--help` to see lineage options.")
+            model_filepath = self.check_for_lineage_model(args.lineage, args.downloaded_model_path)
             if args.subsequence_length is None:
                 key = {'vertebrate': 213840, 'land_plant': 64152, 'fungi': 21384, 'invertebrate': 213840}
                 args.subsequence_length = key[args.lineage]
@@ -127,19 +155,22 @@ class HelixerParameterParser(ParameterParser):
                    f'has to be evenly divisible by {timestep_width}')
             assert args.subsequence_length % timestep_width == 0, msg
 
-        if not args.no_overlap:
-            # check user params are valid or set defaults relative to subsequence_length
-            if args.overlap_offset is not None:
-                msg = '--overlap-offset has to evenly divide --subsequence-length'
-                assert args.subsequence_length % args.overlap_offset == 0, msg
-            else:
-                args.overlap_offset = args.subsequence_length // 2
+        # check user params are valid or set defaults relative to subsequence_length
+        # set overlap parameters no matter if overlap is used or not to prevent HelixerModel
+        # from throwing an argparse type error when None gets passed as an argument
+        if args.overlap_offset is not None and not args.no_overlap:
+            msg = (f'the given --overlap-offset of {args.overlap_offset} has to evenly '
+                   f'divide --subsequence-length, which is {args.subsequence_length}')
+            assert args.subsequence_length % args.overlap_offset == 0, msg
+        else:
+            args.overlap_offset = args.subsequence_length // 2
 
-            if args.overlap_core_length is not None:
-                msg = '--overlap-core-length has to be smaller than --subsequence-length'
-                assert args.subsequence_length > args.overlap_core_length, msg
-            else:
-                args.overlap_core_length = int(args.subsequence_length * 3 / 4)
+        if args.overlap_core_length is not None and not args.no_overlap:
+            msg = (f'the given --overlap-core-length of {args.overlap_core_length} has to be smaller '
+                   f'than --subsequence-length, which is {args.subsequence_length}')
+            assert args.subsequence_length > args.overlap_core_length, msg
+        else:
+            args.overlap_core_length = int(args.subsequence_length * 3 / 4)
 
         # check if custom temporary dir actually exists
         if args.temporary_dir is not None:
@@ -151,7 +182,10 @@ class HelixerParameterParser(ParameterParser):
                 raise e
 
 
-def main():
+def main() -> None:
+    logging.config.dictConfig(get_log_dict())
+    logger = logging.getLogger('HelixerLogger')
+    logger.info(colored(f'Starting Helixer, using python version {sys.version}', 'green'))
     helixer_post_bin = 'helixer_post_bin'
     start_time = time.time()
     pp = HelixerParameterParser('config/helixer_config.yaml')
@@ -159,14 +193,15 @@ def main():
     args.overlap = not args.no_overlap  # minor overlapping is a far better default for inference. Thus, this hack.
     # before we start, check if helixer_post_bin will (presumably) be able to run
     # first, is it there
-    print(colored(f'Testing whether {helixer_post_bin} is correctly installed', 'green'))
+    logger.info(colored('\nHelixer.py config:\n', 'yellow') + f'{pformat(vars(args))}\n')
+    logger.info(colored(f'Testing whether {helixer_post_bin} is correctly installed', 'green'))
     if not shutil.which(helixer_post_bin):
         print(colored(f'\nError: {helixer_post_bin} not found in $PATH, this is required for Helixer.py to complete.\n',
                       'red'),
               file=sys.stderr)
-        print('Installation instructions: https://github.com/TonyBolger/HelixerPost, the lzf library is OPTIONAL',
+        print('Installation instructions: https://github.com/usadellab/HelixerPost, the lzf library is OPTIONAL',
               file=sys.stderr)
-        print('Remember to add the compiled binary to a folder in your PATH variable.')
+        print('Remember to add the compiled binary to a folder in your PATH variable.', file=sys.stderr)
         sys.exit(1)
     else:
         run = subprocess.run([helixer_post_bin])
@@ -185,30 +220,33 @@ def main():
             pass
         os.remove(test_file)
     except Exception as e:
-        print(colored(f'checking if a random test file ({test_file}) can be written in the output directory', 'yellow'))
+        print(colored(f'checking if a random test file ({test_file}) can be written in the output directory',
+                      'yellow'), file=sys.stderr)
         if not os.path.isdir(out_dir):
             # the 'file not found error' for the directory when the user is thinking
             # "of course it's not there, I want to crete it"
             # tends to confuse..., so make it obvious here
             print(colored(f'the output directory {out_dir}, needed to write the '
-                  f'output file {args.gff_output_path}, is absent, inaccessible, or not a directory', 'red'))
+                  f'output file {args.gff_output_path}, is absent, inaccessible, or not a directory', 'red'),
+                  file=sys.stderr)
         raise e
 
-    print(colored('Helixer.py config loaded. Starting FASTA to H5 conversion.', 'green'))
+    logger.info(colored('Starting FASTA to H5 conversion.', 'green'))
     # generate the .h5 file in a temp dir, which is then deleted
     with tempfile.TemporaryDirectory(dir=args.temporary_dir) as tmp_dirname:
-        print(f'storing temporary files under {tmp_dirname}')
+        logger.info(f'Storing temporary files under {tmp_dirname}')
         tmp_genome_h5_path = os.path.join(tmp_dirname, f'tmp_species_{args.species}.h5')
         tmp_pred_h5_path = os.path.join(tmp_dirname, f'tmp_predictions_{args.species}.h5')
 
         controller = HelixerFastaToH5Controller(args.fasta_path, tmp_genome_h5_path)
         # hard coded subsequence length due to how the models have been created
         controller.export_fasta_to_h5(chunk_size=args.subsequence_length, compression=args.compression,
-                                      multiprocess=not args.no_multiprocess, species=args.species)
+                                      multiprocess=not args.no_multiprocess, species=args.species,
+                                      write_by=args.write_by)
 
         msg = 'with' if args.overlap else 'without'
         msg = 'FASTA to H5 conversion done. Starting neural network prediction ' + msg + ' overlapping.'
-        print(colored(msg, 'green'))
+        logger.info(colored(msg, 'green'))
 
         hybrid_model_args = [
             '--verbose',
@@ -222,12 +260,12 @@ def main():
         ]
         if args.overlap:
             hybrid_model_args.append('--overlap')
-        if args.debug:
-            hybrid_model_args.append('--debug')
+        if args.deterministic:
+            hybrid_model_args.append('--deterministic')
         model = HybridModel(cli_args=hybrid_model_args)
         model.run()
 
-        print(colored('Neural network prediction done. Starting post processing.', 'green'))
+        logger.info(colored('Neural network prediction done. Starting post processing.', 'green'))
 
         # call to HelixerPost, has to be in PATH
         helixerpost_cmd = [helixer_post_bin, tmp_genome_h5_path, tmp_pred_h5_path]
@@ -237,11 +275,11 @@ def main():
         helixerpost_out = subprocess.run(helixerpost_cmd)
         if helixerpost_out.returncode == 0:
             run_time = time.time() - start_time
-            print(colored(f'\nHelixer successfully finished the annotation of {args.fasta_path} '
-                          f'in {run_time / (60 * 60):.2f} hours. '
-                          f'GFF file written to {args.gff_output_path}.', 'green'))
+            logger.info(colored(f'\nHelixer successfully finished the annotation of {args.fasta_path} '
+                                f'in {run_time / 60:.2f} minutes. '
+                                f'GFF file written to {args.gff_output_path}.', 'green'))
         else:
-            print(colored('\nAn error occurred during post processing. Exiting.', 'red'))
+            print(colored('\nAn error occurred during post processing. Exiting.', 'red'), file=sys.stderr)
 
 
 if __name__ == '__main__':

@@ -11,11 +11,13 @@ import copy
 
 import h5py.utils
 import numpy as np
+from collections.abc import Iterator
 from multiprocessing import Pool
 
 
 class ContiguousBit:
-    def __init__(self, seqid, start_ends, start_i_h5, end_i_h5):
+    def __init__(self, seqid: bytes, start_ends: list[tuple[int, int]],
+                 start_i_h5: int, end_i_h5: int) -> None:
         self.seqid = seqid
         self.start_ends = start_ends
         # indexes in h5 file
@@ -24,7 +26,7 @@ class ContiguousBit:
         assert len(self.start_ends) == end_i_h5 - start_i_h5, '{} {} {}'.format(len(self.start_ends), start_i_h5,
                                                                                 end_i_h5)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "array from {}-{}; h5 from [{},{}) in h5 in {} pieces".format(self.start_ends[0][0],
                                                                              self.start_ends[-1][1],
                                                                              self.start_i_h5,
@@ -32,14 +34,14 @@ class ContiguousBit:
                                                                              len(self.start_ends))
 
 
-def get_length_from_header(htseqbam, chromosome):
+def get_length_from_header(htseqbam: object, chromosome: str) -> int:
     hdict = htseqbam.get_header_dict()
     sqs = [x for x in hdict['SQ'] if x['SN'] == chromosome]
     assert len(sqs) == 1, "found {}, searching for {}".format(sqs, chromosome)
     return sqs[0]['LN']
 
 
-def skippable(read):
+def skippable(read: object) -> bool:
     out = False
     if read.iv is None:
         out = True
@@ -50,14 +52,14 @@ def skippable(read):
     return out
 
 
-def is_coverage(cigar_entry):
+def is_coverage(cigar_entry: object) -> bool:
     if cigar_entry.type in ["=", "X", "M"]:
         return True
     else:
         return False
 
 
-def is_spliced_coverage(cigar_entry):
+def is_spliced_coverage(cigar_entry: object) -> bool:
     # including D because interpreting deletions as splicing is small count error
     # but if any splicing is marked with D, missing this would be a large count error
     if cigar_entry.type in ["N", "D"]:
@@ -66,7 +68,7 @@ def is_spliced_coverage(cigar_entry):
         return False
 
 
-def get_sense_strand(read, sense_strand=2):
+def get_sense_strand(read: object, sense_strand: int = 2) -> str:
     """returns strand of original mRNA
 
     default is dUTP protocol, that is, 2nd read is sense strand"""
@@ -99,7 +101,8 @@ def get_sense_strand(read, sense_strand=2):
     return strand
 
 
-def get_sense_cov_intervals(read, chromosomes, strandedness, shift):
+def get_sense_cov_intervals(read: object, chromosomes: dict[str, int],
+                            strandedness: int | None, shift: bool) -> list[list[object]]:
     """gets intervals for standard and spliced coverage"""
     chromosome = list(chromosomes.keys())[0]
     length = chromosomes[chromosome]
@@ -131,7 +134,7 @@ def get_sense_cov_intervals(read, chromosomes, strandedness, shift):
     return out  # list [standard, spliced] of coverage intervals
 
 
-def get_shifted_interval(read):
+def get_shifted_interval(read: object) -> tuple[int, int]:
     """shift interval to tn5 cut site"""
     # tn5 bind about 9 bp of DNA, and adds adapters on the 5' end in each direction
     # so the middle of the binding site is just downstream of the 5' end
@@ -150,12 +153,14 @@ def get_shifted_interval(read):
         raise ValueError(f'unknown strand {read.iv.strand}')
 
 
-def write_in_bits(array, contiguous_bits, h5_dataset, chunk_size, target_row=None):
+def write_in_bits(array: np.ndarray, contiguous_bits: list[ContiguousBit],
+                  h5_dataset: h5py.Dataset, chunk_size: int, target_row: int | None = None) -> None:
     for bit in contiguous_bits:
         write_a_bit(array, bit, h5_dataset, chunk_size, target_row)
 
 
-def write_a_bit(array, bit, h5_dataset, chunk_size, target_row=None):
+def write_a_bit(array: np.ndarray, bit: ContiguousBit, h5_dataset: h5py.Dataset,
+                chunk_size: int, target_row: int | None = None) -> None:
     start_array = bit.start_ends[0][0]
     end_array = bit.start_ends[-1][1]
 
@@ -186,7 +191,8 @@ def write_a_bit(array, bit, h5_dataset, chunk_size, target_row=None):
         h5_dataset[bit.start_i_h5:bit.end_i_h5, :, target_row] = array_slice
 
 
-def find_contiguous_segments(h5, start_i, end_i, chunk_size):
+def find_contiguous_segments(h5: h5py.File, start_i: int, end_i: int,
+                             chunk_size: int) -> tuple[list[ContiguousBit], list[ContiguousBit]]:
     bits_plus = []
     bits_minus = []
 
@@ -242,7 +248,7 @@ def find_contiguous_segments(h5, start_i, end_i, chunk_size):
     return bits_plus, bits_minus
 
 
-def add_empty_ngs_datasets(h5, n):
+def add_empty_ngs_datasets(h5: h5py.File, n: int) -> None:
     length = h5['data/X'].shape[0]
     chunk_len = h5['data/X'].shape[1]
     if 'evaluation' not in h5.keys():
@@ -258,7 +264,7 @@ def add_empty_ngs_datasets(h5, n):
                           shuffle=True)
 
 
-def add_empty_cov_meta(h5, n):
+def add_empty_cov_meta(h5: h5py.File, n: int) -> None:
     meta_str = META_STR
     if meta_str not in h5['evaluation'].keys():
         h5.create_group(f'evaluation/{meta_str}')
@@ -269,7 +275,7 @@ def add_empty_cov_meta(h5, n):
                       fillvalue=''.encode('ASCII'))
 
 
-def cov_by_chrom(chrm_bam_strandedness_shift):
+def cov_by_chrom(chrm_bam_strandedness_shift: tuple[str, str, int | None, bool]) -> tuple[object, object, int, dict[str, int], tuple[str, str]]:
     chromosome, bam_file, strandedness,  shift = chrm_bam_strandedness_shift
     htseqbam = H5_BAMS[bam_file]
 
@@ -305,7 +311,8 @@ def cov_by_chrom(chrm_bam_strandedness_shift):
     return cov_array, spliced_array, length, counts, memmap_dirs
 
 
-def gen_coords(h5_sorted, sp_start_i=0, sp_end_i=None):
+def gen_coords(h5_sorted: h5py.File, sp_start_i: int = 0,
+               sp_end_i: int | None = None) -> Iterator[tuple[bytes, int, int]]:
     """gets unique seqids, range, and seq length from h5 file"""
     # uses tuple with (seqid, max_coord)
     previous = just_seqid(h5_sorted, sp_start_i)
@@ -321,11 +328,12 @@ def gen_coords(h5_sorted, sp_start_i=0, sp_end_i=None):
     yield previous, coord_start_i, sp_end_i
 
 
-def just_seqid(h5, i):
+def just_seqid(h5: h5py.File, i: int) -> bytes:
     return h5['data/seqids'][i]
 
 
-def matches_and_no_end_case(starts, ends, is_plusses, chunk_size):
+def matches_and_no_end_case(starts: tuple[int, int], ends: tuple[int, int],
+                            is_plusses: tuple[bool, bool], chunk_size: int) -> bool:
     curr_start, prev_start = starts
     curr_end, prev_end = ends
     # we can assume contiguity and same sequence, only break at strand flip
@@ -342,7 +350,7 @@ def matches_and_no_end_case(starts, ends, is_plusses, chunk_size):
     return out
 
 
-def species_range(h5, species):
+def species_range(h5: h5py.File, species: str) -> tuple[int, int]:
     mask = np.array(h5['/data/species'][:] == species.encode('utf-8'))
     stretches = list(get_bool_stretches(mask.tolist()))  # [(False, Count), (True, Count), (False, Count)]
     print(stretches)
@@ -359,7 +367,7 @@ def species_range(h5, species):
         raise ValueError("should never be reached, maybe h5 sorting something or failed bool comparisons (None or so?)")
 
 
-def get_bool_stretches(alist):
+def get_bool_stretches(alist: list[bool]) -> Iterator[tuple[bool, int]]:
     targ = alist[0]
     while alist:
         try:
@@ -373,14 +381,16 @@ def get_bool_stretches(alist):
         alist = alist[i:]
 
 
-def pad_cov_right(short_arr, length, fill_value=-1.):
+def pad_cov_right(short_arr: np.ndarray, length: int, fill_value: float = -1.) -> np.ndarray:
     out = np.full(shape=(length,), fill_value=fill_value)
     out[:short_arr.shape[0]] = short_arr
     return out
 
 
-def cage_coverage_from_coord_to_h5(coord, h5_out, strandedness, chunk_size, old_final_dimension, threads,
-                                   shift):
+def cage_coverage_from_coord_to_h5(coord: tuple[bytes, int, int], h5_out: h5py.File,
+                                   strandedness: int | None, chunk_size: int,
+                                   old_final_dimension: int, threads: int,
+                                   shift: bool) -> dict[str, int]:
     """calculates coverage for a coordinate from bam, saves to h5, returns counts for aggregating"""
     b_seqid, start_i, end_i = coord
     seqid = b_seqid.decode('utf-8')
@@ -422,7 +432,8 @@ def cage_coverage_from_coord_to_h5(coord, h5_out, strandedness, chunk_size, old_
     return counts
 
 
-def main(species, h5_data, strandedness, prefix, threads, shift):
+def main(species: str, h5_data: str, strandedness: int | None, prefix: str,
+         threads: int, shift: bool) -> None:
     # open h5
     h5 = h5py.File(h5_data, 'r+')
     # create evaluation, score, & metadata placeholders if they don't exist
@@ -479,10 +490,11 @@ if __name__ == "__main__":
                         required=True)
     parser.add_argument('-b', '--bam', help='sorted (and indexed) bam file. Omit to only score existing coverage.',
                         nargs='+', required=True)
-    parser.add_argument('--dataset-prefix', help="prefix for the datasets file to store the resulting coverage "
-                                                 "current expected values are 'rnaseq', or 'cage' (default). "
-                                                 "datasets will be /evaluation/{prefix}_(spliced_)coverage ",
-                        default='cage')
+    parser.add_argument('--dataset-prefix',
+                        help="prefix for the datasets file to store the resulting coverage "
+                             "current expected values are 'rnaseq' (default), 'cage', or 'atacseq'; "
+                             "datasets will be /evaluation/{prefix}_(spliced_)coverage ",
+                        default='rnaseq')
     parser.add_argument('--first-read-is-sense-strand',
                         help='first strand is sense strand, e.g. reads are not from a typical dUTP protocol',
                         action='store_true')
@@ -490,7 +502,8 @@ if __name__ == "__main__":
                         help='second strand is sense strand, e.g. reads ARE from a typical dUTP protocol')
     parser.add_argument('--unstranded', action='store_true',
                         help='reads are not stranded, final "strand" will simply arbitrarily match read strand')
-    parser.add_argument('--threads', default=8, help="how many threads, set to a value <= 1 to not use multiprocessing",
+    parser.add_argument('--threads', default=8,
+                        help="how many threads, set to a value <= 1 to not use multiprocessing",
                         type=int)
     parser.add_argument('--shift', action='store_true',
                         help='shift reads +4 (+ strand) or -5 (- strand) base pairs as is typically done for ATAC-seq '
@@ -512,7 +525,8 @@ if __name__ == "__main__":
         raise FileNotFoundError(f"file {args.h5_data} doesn't exist")
 
     try:
-        h5py.File(args.h5_data, "r")
+        with h5py.File(args.h5_data, 'r'):
+            pass
     except OSError as e:
         raise OSError(f"{args.h5_data} is not a h5 file, please provide a valid h5 file") from e
 

@@ -1,5 +1,6 @@
 import os
 import csv
+import logging
 from shutil import copyfile
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,25 +10,28 @@ from geenuff.base.helpers import full_db_path, reverse_complement
 from geenuff.base.orm import Coordinate, Genome
 from helixer.core.orm import Mer, MetaInformation
 
+logger = logging.getLogger('HelixerLogger')
+
 
 class HelixerController(object):
-    def __init__(self, db_path_in, db_path_out, meta_info_root_path, meta_info_csv_path):
+    def __init__(self, db_path_in: str, db_path_out: str, meta_info_root_path: str,
+                 meta_info_csv_path: str) -> None:
         self.meta_info_root_path = meta_info_root_path
         self.meta_info_csv_path = meta_info_csv_path
         self._setup_db(db_path_in, db_path_out)
         self._mk_session()
 
-    def _setup_db(self, db_path_in, db_path_out):
+    def _setup_db(self, db_path_in: str, db_path_out: str) -> None:
         self.db_path = db_path_out
         if db_path_out != '':
             if os.path.exists(db_path_out):
-                print('overriding the helixer output db at {}'.format(db_path_out))
+                logger.info('Overriding the helixer output db at {}'.format(db_path_out))
             copyfile(db_path_in, db_path_out)
         else:
-            print('adding the helixer additions directly to input db at {}'.format(db_path_in))
+            logger.info('Adding the helixer additions directly to input db at {}'.format(db_path_in))
             self.db_path = db_path_in
 
-    def _mk_session(self):
+    def _mk_session(self) -> None:
         self.engine = create_engine(full_db_path(self.db_path), echo=False)
         # add Helixer specific tables to the input db if they don't exist yet
         new_tables = ['mer', 'meta_information']
@@ -36,15 +40,15 @@ class HelixerController(object):
                 geenuff.orm.Base.metadata.tables[table].create(self.engine)
         self.session = sessionmaker(bind=self.engine)()
 
-    def _coord_ids_of_genome(self, genome_id):
-        print('Starting query for all coordinate ids')
+    def _coord_ids_of_genome(self, genome_id: int) -> dict[str, int]:
+        logger.info('Starting query for all coordinate ids')
         coords = (self.session.query(Coordinate.id, Coordinate.seqid)
                      .filter(Coordinate.genome_id == genome_id)
                      .all())
         coord_ids = {seqid:coord_id for (coord_id, seqid) in coords}
         return coord_ids
 
-    def _add_mers_of_seqid(self, coord_id, seqid, mers):
+    def _add_mers_of_seqid(self, coord_id: int, seqid: str, mers: dict[str, int]) -> None:
         for mer_sequence, count in mers.items():
             mer = Mer(coordinate_id=coord_id,
                       mer_sequence=mer_sequence,
@@ -52,7 +56,7 @@ class HelixerController(object):
                       length=len(mer_sequence))
             self.session.add(mer)
 
-    def add_mer_counts_to_db(self):
+    def add_mer_counts_to_db(self) -> None:
         """Tries to add all kmer counts it can find for each coordinate in the db
         Assumes the kmer file to contain non-collapsed kmers ordered by coordinate first and kmer
         sequence second"""
@@ -75,7 +79,7 @@ class HelixerController(object):
 
                     # insert coordinate mers
                     if last_seqid != seqid:
-                        print(genome.species, last_seqid)
+                        logger.info(f'{genome.species}, {last_seqid}')
                         self._add_mers_of_seqid(coord_ids[last_seqid], last_seqid, seqid_mers)
                         seqid_mers = {}
                         last_seqid = seqid
@@ -90,16 +94,16 @@ class HelixerController(object):
 
                     # making sure to commit frequently but not all the time
                     if i % 1000000 == 0:
-                        print('Committing intermittent changes to the db')
+                        logger.info('Committing intermittent changes to the db')
                         self.session.commit()
 
-                print(genome.species, last_seqid)
+                logger.info(f'{genome.species}, {last_seqid}')
                 self._add_mers_of_seqid(coord_ids[last_seqid], last_seqid, seqid_mers)
-                print('Committing final changes to the db')
+                logger.info('Committing final changes to the db')
                 self.session.commit()
-                print('Kmers from file {} added\n'.format(kmer_file))
+                logger.info('Kmers from file {} added\n'.format(kmer_file))
 
-    def add_meta_info_to_db(self):
+    def add_meta_info_to_db(self) -> None:
         """For each genome found in the db, the function tries to insert meta data from the
         csv file into the meta_information table."""
         with open(self.meta_info_csv_path) as f:
@@ -115,7 +119,7 @@ class HelixerController(object):
                     if key != 'species':
                         meta_info = MetaInformation(genome=genome, name=key, value=value)
                         self.session.add(meta_info)
-                print('Meta info added for {}'.format(genome.species))
+                logger.info('Meta info added for {}'.format(genome.species))
             else:
-                print('Meta info not found for {}'.format(genome.species))
+                logger.info('Meta info not found for {}'.format(genome.species))
         self.session.commit()

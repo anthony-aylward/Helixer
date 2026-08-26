@@ -22,7 +22,7 @@ class Mer(orm.Base):
         CheckConstraint('length >= 1', name='check_length_gt_1'),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Mer {}, coord_id: {}, seq: {}, count: {}, len: {}>'.format(self.id,
                                                                             self.coordinate_id,
                                                                             self.mer_sequence,
@@ -44,7 +44,7 @@ class MetaInformation(orm.Base):
         UniqueConstraint('name', 'genome_id', name='unique_meta_info_per_genome'),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<MetaInformation {}, genome_id: {}, name: {}, value: {}>'.format(self.id,
                                                                                  self.genome_id,
                                                                                  self.name,

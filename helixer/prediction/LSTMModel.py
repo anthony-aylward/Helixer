@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import ast
 import warnings
 import tensorflow as tf
 
@@ -42,7 +43,7 @@ class LSTMModel(HelixerModel):
             n_layers = int(self.layers)
             self.layers = [self.units] * n_layers
         else:
-            self.layers = eval(self.layers)
+            self.layers = ast.literal_eval(self.layers)
             assert isinstance(self.layers, list)
         for key in ["save_model_path", "prediction_output_path", "test_data",
                     "load_model_path", "data_dir"]:
