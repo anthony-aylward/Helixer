@@ -1,4 +1,4 @@
-from geenuff import orm
+from rare_geenuff import orm
 from sqlalchemy import Column, Integer, Float, ForeignKey, UniqueConstraint, CheckConstraint, String
 from sqlalchemy.orm import relationship
 

@@ -16,13 +16,11 @@ filelock==3.20.3
 flatbuffers==24.3.7
 fonttools==4.60.2
 gast==0.5.4
-rare-geenuff==0.1.0
 google-auth==2.29.0
 # google-auth-oauthlib==1.2.0
 google-pasta==0.2.0
 grpcio==1.62.1
 h5py==3.10.0
-rare-helixer==0.3.7
 HTSeq==2.0.5
 idna==3.7
 iniconfig==2.0.0
@@ -59,6 +57,7 @@ PythonWebHDFS==0.2.3
 pytz==2024.1
 PyYAML==6.0.1
 rare-geenuff==0.1.0
+rare-helixer==0.3.8
 requests==2.32.2
 requests-oauthlib==2.0.0
 responses==0.25.0

@@ -21,7 +21,7 @@ import h5py
 import numpy as np
 import pytest
 
-from geenuff.applications.importer import ImportController
+from rare_geenuff.applications.importer import ImportController
 from helixer.export.exporter import HelixerExportController, HelixerFastaToH5Controller
 
 # Paths and constants

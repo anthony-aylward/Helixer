@@ -5,10 +5,11 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import pytest
 import h5py
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
 
 import rare_geenuff
-from rare_geenuff.tests.test_geenuff import mk_memory_session
+# from rare_geenuff.tests.test_geenuff import mk_memory_session
 from rare_geenuff.applications.importer import ImportController
 from rare_geenuff.base.orm import SuperLocus, Genome, Coordinate
 from rare_geenuff.base.helpers import reverse_complement
@@ -32,6 +33,13 @@ FASTA_OUT_FILE = H5_OUT_FOLDER + 'fasta_test_data.h5'
 EVAL_H5 = 'testdata/tmp.h5'
 
 
+### Helper functions ###
+def mk_memory_session(db_path='sqlite:///:memory:'):
+    engine = create_engine(db_path, echo=False)
+    rare_geenuff.orm.Base.metadata.create_all(engine)
+    s = sessionmaker(bind=engine)
+    return s()
+
 # Session-scoped fixtures
 # --------------------------------------------------------------------------
 
@@ -47,7 +55,7 @@ def setup_dummy_db(request: pytest.FixtureRequest) -> None:
     os.makedirs(os.path.dirname(DUMMYLOCI_DB), exist_ok=True)
 
     # make sure we have the same test data that Geenuff has
-    geenuff_test_folder = os.path.dirname(geenuff.__file__) + '/testdata/'
+    geenuff_test_folder = os.path.dirname(rare_geenuff.__file__) + '/testdata/'
     files = ['dummyloci.fa', 'dummyloci.gff', 'basic_sequences.fa']
     for f in files:
         copy(geenuff_test_folder + f, 'testdata/')
@@ -133,12 +141,12 @@ def setup_simpler_numerifier() -> tuple[Session, Coordinate]:
     genome = Genome()
     coord = Coordinate(genome=genome, sequence='A' * 100, length=100, seqid='a')
     sl = SuperLocus()
-    transcript = geenuff.orm.Transcript(super_locus=sl)
-    piece = geenuff.orm.TranscriptPiece(transcript=transcript, position=0)
-    transcript_feature = geenuff.orm.Feature(start=40,
+    transcript = rare_geenuff.orm.Transcript(super_locus=sl)
+    piece = rare_geenuff.orm.TranscriptPiece(transcript=transcript, position=0)
+    transcript_feature = rare_geenuff.orm.Feature(start=40,
                                              end=9,
                                              is_plus_strand=False,
-                                             type=geenuff.types.GEENUFF_TRANSCRIPT,
+                                             type=rare_geenuff.types.GEENUFF_TRANSCRIPT,
                                              start_is_biological_start=True,
                                              end_is_biological_end=True,
                                              coordinate=coord)
@@ -966,41 +974,41 @@ def setup_feature_transitions() -> tuple[Session, Coordinate]:
     genome = Genome()
     coord = Coordinate(genome=genome, sequence='A' * 720, length=720, seqid='a')
     s1 = SuperLocus()
-    transcript = geenuff.orm.Transcript(super_locus=s1)
-    piece = geenuff.orm.TranscriptPiece(transcript=transcript, position=0)
+    transcript = rare_geenuff.orm.Transcript(super_locus=s1)
+    piece = rare_geenuff.orm.TranscriptPiece(transcript=transcript, position=0)
     transcript_feature_tr = geenuff.orm.Feature(start=41,
                                                 end=671,
                                                 is_plus_strand=True,
-                                                type=geenuff.types.GEENUFF_TRANSCRIPT,
+                                                type=rare_geenuff.types.GEENUFF_TRANSCRIPT,
                                                 start_is_biological_start=True,
                                                 end_is_biological_end=True,
                                                 coordinate=coord)
-    transcript_feature_cds = geenuff.orm.Feature(start=131,
+    transcript_feature_cds = rare_geenuff.orm.Feature(start=131,
                                                  end=401,
                                                  is_plus_strand=True,
-                                                 type=geenuff.types.GEENUFF_CDS,
+                                                 type=rare_geenuff.types.GEENUFF_CDS,
                                                  start_is_biological_start=True,
                                                  end_is_biological_end=True,
                                                  phase=0,
                                                  coordinate=coord)
-    transcript_feature_intron1 = geenuff.orm.Feature(start=221,
+    transcript_feature_intron1 = rare_geenuff.orm.Feature(start=221,
                                                      end=311,
                                                      is_plus_strand=True,
-                                                     type=geenuff.types.GEENUFF_INTRON,
+                                                     type=rare_geenuff.types.GEENUFF_INTRON,
                                                      start_is_biological_start=True,
                                                      end_is_biological_end=True,
                                                      coordinate=coord)
-    transcript_feature_intron2 = geenuff.orm.Feature(start=491,
+    transcript_feature_intron2 = rare_geenuff.orm.Feature(start=491,
                                                      end=581,
                                                      is_plus_strand=True,
-                                                     type=geenuff.types.GEENUFF_INTRON,
+                                                     type=rare_geenuff.types.GEENUFF_INTRON,
                                                      start_is_biological_start=True,
                                                      end_is_biological_end=True,
                                                      coordinate=coord)
-    transcript_feature_tr2 = geenuff.orm.Feature(start=705,
+    transcript_feature_tr2 = rare_geenuff.orm.Feature(start=705,
                                                  end=720,
                                                  is_plus_strand=True,
-                                                 type=geenuff.types.GEENUFF_TRANSCRIPT,
+                                                 type=rare_geenuff.types.GEENUFF_TRANSCRIPT,
                                                  start_is_biological_start=True,
                                                  end_is_biological_end=True,
                                                  coordinate=coord)

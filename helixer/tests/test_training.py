@@ -29,7 +29,7 @@ import zipfile
 import h5py
 import pytest
 
-from geenuff.applications.importer import ImportController
+from rare_geenuff.applications.importer import ImportController
 from helixer.export.exporter import HelixerExportController
 
 # Paths and constants
