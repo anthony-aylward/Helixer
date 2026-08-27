@@ -12,8 +12,8 @@ from importlib.metadata import version
 
 import rare_geenuff
 import helixer
-from geenuff.applications.exporter import GeenuffExportController
-from geenuff.applications.importer import FastaImporter
+from rare_geenuff.applications.exporter import GeenuffExportController
+from rare_geenuff.applications.importer import FastaImporter
 from .numerify import CoordNumerifier, MatAndInfo
 
 logger = logging.getLogger('HelixerLogger')

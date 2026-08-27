@@ -30,7 +30,7 @@ class ParameterParser(ABC):
         self.data_group.add_argument('--no-multiprocess', action='store_true',
                                      help='Whether to not parallize the numerification of large sequences. Uses half'
                                           'the memory but can be much slower when many CPU cores can be utilized.')
-        self.parser.add_argument('--version', action='version', version='%(prog)s ' + version('helixer'))
+        self.parser.add_argument('--version', action='version', version='%(prog)s ' + version('rare_helixer'))
         # Default values have to be specified - and potentially added - here
         self.defaults = {'compression': 'gzip', 'no_multiprocess': False}
 
