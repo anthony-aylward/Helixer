@@ -18,19 +18,19 @@ fonttools==4.60.2
 gast==0.5.4
 rare-geenuff==0.1.0
 google-auth==2.29.0
-google-auth-oauthlib==1.2.0
+# google-auth-oauthlib==1.2.0
 google-pasta==0.2.0
 grpcio==1.62.1
 h5py==3.10.0
-#-e git+ssh://git@github-realname/weberlab-hhu/Helixer.git@887e09104cf0895f1e3937434ae75d0fc15ff21a#egg=helixer
+rare-helixer==0.3.7
 HTSeq==2.0.5
 idna==3.7
 iniconfig==2.0.0
 intervaltree==3.1.0
 joblib==1.3.2
 json-tricks==3.17.3
-keras==2.15.0
-keras-layer-normalization==0.16.0
+# keras==2.15.0
+# keras-layer-normalization==0.16.0
 kiwisolver==1.4.5
 libclang==18.1.1
 Markdown==3.8.1
@@ -58,6 +58,7 @@ python-dateutil==2.9.0.post0
 PythonWebHDFS==0.2.3
 pytz==2024.1
 PyYAML==6.0.1
+rare-geenuff==0.1.0
 requests==2.32.2
 requests-oauthlib==2.0.0
 responses==0.25.0
@@ -70,11 +71,11 @@ simplejson==3.19.2
 six==1.16.0
 sortedcontainers==2.4.0
 SQLAlchemy==1.3.22
-tensorboard==2.15.2
-tensorboard-data-server==0.7.2
-tensorflow==2.15.1
+# tensorboard==2.15.2
+# tensorboard-data-server==0.7.2
+# tensorflow==2.15.1
 tensorflow-addons==0.23.0
-tensorflow-estimator==2.15.0
+# tensorflow-estimator==2.15.0
 tensorflow-io-gcs-filesystem==0.36.0
 termcolor==2.4.0
 terminaltables==3.1.10
@@ -82,7 +83,7 @@ threadpoolctl==3.4.0
 tomli==2.0.1
 tqdm==4.66.3
 typeguard==2.13.3
-typing_extensions==4.10.0
+# typing_extensions==4.10.0
 tzdata==2024.1
 urllib3==2.6.3
 wcwidth==0.2.13

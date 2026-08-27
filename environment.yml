@@ -1,6 +1,13 @@
 name: helixer
+channels:
+    - bioconda
+    - conda-forge
 dependencies: 
-    - python
+    - python==3.11.16
+    - tensorflow==2.13.1
+    - tensorflow-estimator
+    - keras
+    - typing_extensions
     - pip
     - pip :
         - -r requirements.3.10.txt 
