@@ -10,7 +10,7 @@ import logging
 from collections.abc import Iterator
 from importlib.metadata import version
 
-import geenuff
+import rare_geenuff
 import helixer
 from geenuff.applications.exporter import GeenuffExportController
 from geenuff.applications.importer import FastaImporter

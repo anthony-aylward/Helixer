@@ -1,14 +1,14 @@
 """convert cleaned-db schema to numeric values describing gene structure"""
 import time
 import logging
-import geenuff.base.types
+import rare_geenuff.base.types
 import numpy as np
 import math
 import multiprocess
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
-from geenuff.base import types
+from rare_geenuff.base import types
 
 logger = logging.getLogger('HelixerLogger')
 

@@ -7,12 +7,12 @@ import pytest
 import h5py
 from sqlalchemy.orm import Session
 
-import geenuff
-from geenuff.tests.test_geenuff import mk_memory_session
-from geenuff.applications.importer import ImportController
-from geenuff.base.orm import SuperLocus, Genome, Coordinate
-from geenuff.base.helpers import reverse_complement
-from geenuff.base import types
+import rare_geenuff
+from rare_geenuff.tests.test_geenuff import mk_memory_session
+from rare_geenuff.applications.importer import ImportController
+from rare_geenuff.base.orm import SuperLocus, Genome, Coordinate
+from rare_geenuff.base.helpers import reverse_complement
+from rare_geenuff.base import types
 
 from helixer.core.controller import HelixerController
 from helixer.core import helpers

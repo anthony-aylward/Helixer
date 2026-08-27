@@ -5,9 +5,9 @@ from shutil import copyfile
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import geenuff
-from geenuff.base.helpers import full_db_path, reverse_complement
-from geenuff.base.orm import Coordinate, Genome
+import rare_geenuff
+from rare_geenuff.base.helpers import full_db_path, reverse_complement
+from rare_geenuff.base.orm import Coordinate, Genome
 from helixer.core.orm import Mer, MetaInformation
 
 logger = logging.getLogger('HelixerLogger')
