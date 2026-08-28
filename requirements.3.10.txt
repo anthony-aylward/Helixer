@@ -57,7 +57,7 @@ PythonWebHDFS==0.2.3
 pytz==2024.1
 PyYAML==6.0.1
 rare-geenuff==0.1.1
-rare-helixer==0.3.10
+rare-helixer==0.3.11
 #rare-helixerpost==0.1.0
 requests==2.32.2
 requests-oauthlib==2.0.0

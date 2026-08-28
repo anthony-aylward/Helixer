@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rare-helixer"
-version = "0.3.10"
+version = "0.3.11"
 description = "Structural genome annotation utilizing Deep Neural Networks and a Hidden Markov Model"
 readme = "README.md"
 requires-python = ">=3.11.16"

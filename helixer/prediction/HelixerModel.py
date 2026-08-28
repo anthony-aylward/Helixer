@@ -12,7 +12,7 @@ import numcodecs
 import argparse
 import datetime
 import logging
-from importlib.metadata import version
+from importlib.metadata import version, PackageNotFoundError
 import subprocess
 import numpy as np
 import tensorflow as tf
@@ -975,7 +975,10 @@ class HelixerModel(ABC):
             commit = subprocess.check_output(cmd, stderr=subprocess.STDOUT).strip().decode()
             logger.info(f'Current Helixer branch: {branch} ({commit})')
         except subprocess.CalledProcessError:
-            logger.info(f'Current Helixer version: {version("helixer")}')
+            try:
+                logger.info(f'Current Helixer version: {version("helixer")}')
+            except PackageNotFoundError:
+                logger.info(f'Current Helixer version (rare fork): {version("rare_helixer")}')
 
         try:
             if os.path.isfile(self.load_model_path):
