@@ -9,5 +9,6 @@ dependencies:
     - keras
     - typing_extensions
     - pip
+    - rust
     - pip :
         - -r requirements.3.10.txt 
