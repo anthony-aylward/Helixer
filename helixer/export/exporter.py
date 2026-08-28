@@ -86,7 +86,7 @@ class HelixerExportControllerBase(object):
         }
         # get GeenuFF and Helixer commit hashes
         pwd = os.getcwd()
-        for module in [geenuff, helixer]:
+        for module in [rare_geenuff, helixer]:
             os.chdir(os.path.dirname(module.__file__))
             cmd = ['git', 'describe', '--always']  # show tag or hash if no tag available
             try:

@@ -579,7 +579,7 @@ class SplitFinder:
             # simplify the encoding of phase / avoid painful edge cases
             # this should add all chunk ends with a CDS to the mask
             cs = self.chunk_size
-            if feature.type.value == geenuff.base.types.GEENUFF_CDS:
+            if feature.type.value == rare_geenuff.base.types.GEENUFF_CDS:
                 round_start = math.ceil(f_start / cs)
                 round_end = math.ceil(f_end / cs)
                 for chunk_end in range(round_start * cs, round_end * cs, cs):
