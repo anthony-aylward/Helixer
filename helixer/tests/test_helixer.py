@@ -976,7 +976,7 @@ def setup_feature_transitions() -> tuple[Session, Coordinate]:
     s1 = SuperLocus()
     transcript = rare_geenuff.orm.Transcript(super_locus=s1)
     piece = rare_geenuff.orm.TranscriptPiece(transcript=transcript, position=0)
-    transcript_feature_tr = geenuff.orm.Feature(start=41,
+    transcript_feature_tr = rare_geenuff.orm.Feature(start=41,
                                                 end=671,
                                                 is_plus_strand=True,
                                                 type=rare_geenuff.types.GEENUFF_TRANSCRIPT,
