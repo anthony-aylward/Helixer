@@ -86,6 +86,8 @@ See https://github.com/gglyptodon/helixer-docker
 Please see [full installation instructions](docs/manual_install.md). Manual installation is
 only available for Linux operating systems.
 
+On Ubuntu systems, the dependency HelixerPost may require `apt-get install libhdf5-dev`
+
 ## Galaxy ToolShed
 There is also a [Galaxy installation](https://usegalaxy.eu/?tool_id=toolshed.g2.bx.psu.edu%2Frepos%2Fgenouest%2Fhelixer%2Fhelixer%2F0.3.3%2Bgalaxy1&version=latest)
 of Helixer which you can use for inference.
